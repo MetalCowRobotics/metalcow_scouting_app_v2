@@ -1,0 +1,606 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Loader2, AlertTriangle, MapPin, Gauge, Weight, ArrowUpCircle, Zap, Shield, Settings, Activity } from 'lucide-react'
+import { getTBAData } from '@/lib/tba'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogMedia,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+function AlertModal({ isOpen, onClose, title, message }: { isOpen: boolean, onClose: () => void, title: string, message: string }) {
+    return (
+        <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogMedia className="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500">
+                        <AlertTriangle className="h-6 w-6" />
+                    </AlertDialogMedia>
+                    <AlertDialogTitle>{title}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {message}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogAction onClick={onClose} className="bg-amber-600 hover:bg-amber-700 text-white">
+                        Got it
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )
+}
+
+function TeamNickname({ teamNumber }: { teamNumber: string }) {
+    const [nickname, setNickname] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (!teamNumber) {
+            setNickname(null)
+            return
+        }
+        const fetchTBA = async () => {
+            setLoading(true)
+            try {
+                const data = await getTBAData(`/team/frc${teamNumber}`)
+                setNickname(data.nickname)
+            } catch (e) {
+                setNickname(null)
+            } finally {
+                setLoading(false)
+            }
+        }
+        const timer = setTimeout(fetchTBA, 500)
+        return () => clearTimeout(timer)
+    }, [teamNumber])
+
+    if (loading) return <Loader2 className="h-3 w-3 animate-spin opacity-40 ml-2" />
+    if (!nickname) return null
+    return <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-1 truncate max-w-[200px]" title={nickname}>{nickname}</span>
+}
+
+function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, onSelect: (key: string) => void }) {
+    const [query, setQuery] = useState('')
+    const [suggestions, setSuggestions] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+    const [year, setYear] = useState(new Date().getFullYear().toString())
+
+    useEffect(() => {
+        if (query.length < 3) {
+            setSuggestions([])
+            return
+        }
+        const searchEvents = async () => {
+            setLoading(true)
+            try {
+                const events = await getTBAData(`/events/${year}/simple`)
+                const matches = events
+                    .filter((e: any) =>
+                        e.name.toLowerCase().includes(query.toLowerCase()) ||
+                        e.city.toLowerCase().includes(query.toLowerCase()) ||
+                        e.state_prov?.toLowerCase().includes(query.toLowerCase())
+                    )
+                    .slice(0, 5)
+                setSuggestions(matches)
+            } catch (e) {
+                setSuggestions([])
+            } finally {
+                setLoading(false)
+            }
+        }
+        const timer = setTimeout(searchEvents, 500)
+        return () => clearTimeout(timer)
+    }, [query, year])
+
+    return (
+        <div className="space-y-4">
+            <div className="flex gap-2">
+                <div className="w-24">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Year</Label>
+                    <Input
+                        type="number"
+                        value={year}
+                        onChange={(e) => setYear(e.target.value)}
+                        className="h-10"
+                    />
+                </div>
+                <div className="flex-1 relative">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Search Event</Label>
+                    <Input
+                        placeholder="Search area or event..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        className="h-10 pr-8"
+                    />
+                    {loading && <Loader2 className="absolute right-3 top-[34px] -translate-y-1/2 h-4 w-4 animate-spin opacity-40" />}
+
+                    {suggestions.length > 0 && (
+                        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            {suggestions.map(e => (
+                                <button
+                                    key={e.key}
+                                    type="button"
+                                    onClick={() => {
+                                        onSelect(e.key)
+                                        setQuery('')
+                                        setSuggestions([])
+                                    }}
+                                    className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-0"
+                                >
+                                    <div className="font-bold text-sm">{e.name}</div>
+                                    <div className="text-[10px] text-muted-foreground flex justify-between">
+                                        <span>{e.city}, {e.state_prov}</span>
+                                        <span className="font-mono bg-muted px-1 rounded">{e.key}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+            {currentEventKey && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20 animate-in zoom-in-95">
+                    <div>
+                        <div className="text-[10px] uppercase font-bold text-primary tracking-widest leading-none mb-1">Active Competition</div>
+                        <div className="text-sm font-bold truncate max-w-[200px]">Event Key: {currentEventKey}</div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+const STEPS = {
+    IDENTITY: 0,
+    PHYSICAL: 1,
+    SCORING: 2,
+    ADVANCED: 3,
+}
+
+export default function PitScoutingForm() {
+    const [step, setStep] = useState(STEPS.IDENTITY)
+    const [loading, setLoading] = useState(false)
+    const [increment, setIncrement] = useState(1)
+    const [validTeams, setValidTeams] = useState<number[]>([])
+
+    // Alert Modal State
+    const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({
+        open: false,
+        title: '',
+        message: ''
+    })
+
+    const [formData, setFormData] = useState({
+        team_number: '',
+        event_key: '2025ilpe',
+        weight: 0,
+        fuel_capacity: 0,
+        top_speed: 0,
+        fuel_per_second: 0,
+        primary_role: 'Offense',
+        climb_level: '1',
+        climbs_in_auto: false,
+        obstacle_handling: 'None',
+        drive_train: 'Swerve',
+        scout_name: '',
+        notes: '',
+    })
+
+    const showAlert = (title: string, message: string) => {
+        setAlertConfig({ open: true, title, message })
+    }
+
+    const supabase = createClient()
+
+    // Fetch valid teams for the event
+    useEffect(() => {
+        const fetchTeams = async () => {
+            try {
+                const teams = await getTBAData(`/event/${formData.event_key}/teams/simple`)
+                setValidTeams(teams.map((t: any) => t.team_number).sort((a: number, b: number) => a - b))
+            } catch (e) {
+                console.error('Failed to fetch teams for event:', e)
+                setValidTeams([])
+            }
+        }
+        if (formData.event_key) {
+            fetchTeams()
+        }
+    }, [formData.event_key])
+
+    const handleInputChange = (field: string, value: any) => {
+        setFormData((prev) => ({ ...prev, [field]: value }))
+    }
+
+    const validateStep = () => {
+        if (step === STEPS.IDENTITY) {
+            const isValidTeam = validTeams.includes(parseInt(formData.team_number));
+            if (!formData.team_number || !formData.scout_name || !formData.event_key) {
+                showAlert('Missing Information', 'Please provide Team #, Event, and Scout Name.');
+                return false;
+            }
+            if (validTeams.length > 0 && !isValidTeam) {
+                showAlert('Invalid Team', `Team ${formData.team_number} is not registered for ${formData.event_key}.`);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const nextStep = () => {
+        if (validateStep()) {
+            setStep((prev) => Math.min(prev + 1, STEPS.ADVANCED));
+        }
+    }
+    const prevStep = () => setStep((prev) => Math.max(prev - 1, STEPS.IDENTITY))
+
+    const handleSubmit = async () => {
+        setLoading(true)
+        try {
+            const { error } = await supabase.from('pit_scouting').upsert([
+                {
+                    team_number: parseInt(formData.team_number),
+                    event_key: formData.event_key,
+                    robot_weight: formData.weight,
+                    fuel_capacity: formData.fuel_capacity,
+                    top_speed: formData.top_speed,
+                    fuel_per_second: formData.fuel_per_second,
+                    primary_role: formData.primary_role,
+                    climb_level: parseInt(formData.climb_level),
+                    climbs_in_auto: formData.climbs_in_auto,
+                    obstacle_handling: formData.obstacle_handling,
+                    drive_train_type: formData.drive_train,
+                    scout_name: formData.scout_name,
+                    comments: formData.notes,
+                },
+            ], { onConflict: 'team_number, event_key' })
+
+            if (error) {
+                showAlert('Submission Error', error.message)
+            } else {
+                alert('Pit data locked in successfully!')
+                setStep(STEPS.IDENTITY)
+                setFormData({
+                    team_number: '',
+                    event_key: '2025ilpe',
+                    weight: 0,
+                    fuel_capacity: 0,
+                    top_speed: 0,
+                    fuel_per_second: 0,
+                    primary_role: 'Offense',
+                    climb_level: '1',
+                    climbs_in_auto: false,
+                    obstacle_handling: 'None',
+                    drive_train: 'Swerve',
+                    scout_name: '',
+                    notes: '',
+                })
+            }
+        } catch (err) {
+            console.error('Unexpected error:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const filteredTeams = validTeams
+        .filter(num => num.toString().startsWith(formData.team_number))
+        .slice(0, 5);
+
+    return (
+        <div className="max-w-md md:max-w-2xl mx-auto p-4">
+            <Card className="w-full">
+                <CardHeader>
+                    <CardTitle>Pit Scouting</CardTitle>
+                    <CardDescription>Step {step + 1} of 4</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+
+                    {step === STEPS.IDENTITY && (
+                        <div className="space-y-4 animate-in slide-in-from-right-8 fade-in-0 duration-300">
+                            <h3 className="text-lg font-semibold">Identity</h3>
+
+                            <div className="space-y-4 bg-muted/20 p-4 rounded-2xl border border-dashed">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Competition Setup</h4>
+                                <EventSearch
+                                    currentEventKey={formData.event_key}
+                                    onSelect={(key) => handleInputChange('event_key', key)}
+                                />
+                            </div>
+
+                            <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0 pt-2">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center gap-2">
+                                        <Label htmlFor="team_number">Team #</Label>
+                                        {formData.team_number && (
+                                            <TeamNickname teamNumber={formData.team_number} />
+                                        )}
+                                    </div>
+                                    <div className="relative group">
+                                        <Input
+                                            id="team_number"
+                                            type="number"
+                                            value={formData.team_number}
+                                            onChange={(e) => handleInputChange('team_number', e.target.value)}
+                                            placeholder="254"
+                                            className={cn(
+                                                validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
+                                            )}
+                                        />
+                                        {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && filteredTeams.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-popover border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95">
+                                                <div className="text-[10px] uppercase font-bold text-muted-foreground px-3 py-2 bg-muted/50 border-b">Suggested Teams</div>
+                                                {filteredTeams.map(num => (
+                                                    <button
+                                                        key={num}
+                                                        type="button"
+                                                        onClick={() => handleInputChange('team_number', num.toString())}
+                                                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-0"
+                                                    >
+                                                        Team {num}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && (
+                                        <p className="text-[10px] text-destructive mt-1 font-medium">This team isn't registered for this event.</p>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="scout_name">Scout Name</Label>
+                                    <Input
+                                        id="scout_name"
+                                        value={formData.scout_name}
+                                        onChange={(e) => handleInputChange('scout_name', e.target.value)}
+                                        placeholder="Enter your name"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === STEPS.PHYSICAL && (
+                        <div className="space-y-4 animate-in slide-in-from-right-8 fade-in-0 duration-300">
+                            <h3 className="text-lg font-semibold text-blue-600">Physical Build</h3>
+
+                            <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
+                                <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Increment Step</Label>
+                                <div className="flex bg-background rounded-md p-1 border">
+                                    {[1, 5, 10].map(val => (
+                                        <button
+                                            key={val}
+                                            type="button"
+                                            onClick={() => setIncrement(val)}
+                                            className={`px-3 py-1 text-xs font-bold rounded ${increment === val ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                                        >
+                                            +{val}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+                                <div className="space-y-2">
+                                    <Label>Weight (lbs)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('weight', Math.max(0, formData.weight - increment))}>-</Button>
+                                        <Input
+                                            type="number"
+                                            className="text-center font-bold text-lg"
+                                            value={formData.weight}
+                                            onChange={(e) => handleInputChange('weight', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('weight', formData.weight + increment)}>+</Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Top Speed (ft/s)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('top_speed', Math.max(0, formData.top_speed - increment))}>-</Button>
+                                        <Input
+                                            type="number"
+                                            className="text-center font-bold text-lg"
+                                            value={formData.top_speed}
+                                            onChange={(e) => handleInputChange('top_speed', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('top_speed', formData.top_speed + increment)}>+</Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Drive Train Type</Label>
+                                <div className="flex gap-2">
+                                    {['Tank', 'Swerve'].map(type => (
+                                        <Button
+                                            key={type}
+                                            type="button"
+                                            variant={formData.drive_train === type ? 'default' : 'outline'}
+                                            className="w-1/2"
+                                            onClick={() => handleInputChange('drive_train', type)}
+                                        >
+                                            {type}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === STEPS.SCORING && (
+                        <div className="space-y-4 animate-in slide-in-from-right-8 fade-in-0 duration-300">
+                            <h3 className="text-lg font-semibold text-orange-600">Scoring Potential</h3>
+
+                            <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg text-orange-600">
+                                <Label className="text-xs uppercase font-bold opacity-70 tracking-wider">Increment Step</Label>
+                                <div className="flex bg-background rounded-md p-1 border border-orange-200">
+                                    {[1, 5, 10].map(val => (
+                                        <button
+                                            key={val}
+                                            type="button"
+                                            onClick={() => setIncrement(val)}
+                                            className={`px-3 py-1 text-xs font-bold rounded ${increment === val ? 'bg-orange-600 text-white' : 'hover:bg-orange-50'}`}
+                                        >
+                                            +{val}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+                                <div className="space-y-2">
+                                    <Label>Fuel Capacity</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_capacity', Math.max(0, formData.fuel_capacity - increment))}>-</Button>
+                                        <Input
+                                            type="number"
+                                            className="text-center font-bold text-lg"
+                                            value={formData.fuel_capacity}
+                                            onChange={(e) => handleInputChange('fuel_capacity', parseInt(e.target.value) || 0)}
+                                        />
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_capacity', formData.fuel_capacity + increment)}>+</Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Fuel / Sec (Theoretical)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_per_second', Math.max(0, formData.fuel_per_second - increment))}>-</Button>
+                                        <Input
+                                            type="number"
+                                            className="text-center font-bold text-lg"
+                                            value={formData.fuel_per_second}
+                                            onChange={(e) => handleInputChange('fuel_per_second', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_per_second', formData.fuel_per_second + increment)}>+</Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Primary Game Role</Label>
+                                <Select onValueChange={(v) => handleInputChange('primary_role', v)} value={formData.primary_role}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Offense">Offense</SelectItem>
+                                        <SelectItem value="Defense">Defense</SelectItem>
+                                        <SelectItem value="Hybrid">Hybrid</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === STEPS.ADVANCED && (
+                        <div className="space-y-4 animate-in slide-in-from-right-8 fade-in-0 duration-300">
+                            <h3 className="text-lg font-semibold text-purple-600">Advanced Capabilities</h3>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Climb Level Capable</Label>
+                                    <Select onValueChange={(v) => handleInputChange('climb_level', v)} value={formData.climb_level}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">Level 1 (Lowest Hanging)</SelectItem>
+                                            <SelectItem value="2">Level 2 (Mid Bar)</SelectItem>
+                                            <SelectItem value="3">Level 3 (Top Bar)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex items-center justify-between border p-3 rounded-lg">
+                                    <Label>Climb in Auto?</Label>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.climbs_in_auto}
+                                        onChange={(e) => handleInputChange('climbs_in_auto', e.target.checked)}
+                                        className="h-5 w-5"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Field Obstacle Handling</Label>
+                                    <Select onValueChange={(v) => handleInputChange('obstacle_handling', v)} value={formData.obstacle_handling}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="None">None</SelectItem>
+                                            <SelectItem value="Trench">Trench</SelectItem>
+                                            <SelectItem value="Bump">Bump</SelectItem>
+                                            <SelectItem value="Both">Both</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="notes">Scouter Observations</Label>
+                                    <Textarea
+                                        id="notes"
+                                        placeholder="Any additional notes..."
+                                        value={formData.notes}
+                                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                    <Button
+                        variant="outline"
+                        onClick={prevStep}
+                        disabled={step === STEPS.IDENTITY}
+                    >
+                        Back
+                    </Button>
+
+                    {step < STEPS.ADVANCED ? (
+                        <Button onClick={nextStep}>Next</Button>
+                    ) : (
+                        <Button onClick={handleSubmit} disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Lock In Specs
+                        </Button>
+                    )}
+                </CardFooter>
+            </Card>
+
+            <div className="flex justify-center mt-4 gap-2">
+                {Object.values(STEPS).map((s) => (
+                    <div
+                        key={s}
+                        className={`h-2 w-2 rounded-full ${s === step ? 'bg-primary' : 'bg-muted'}`}
+                    />
+                ))}
+            </div>
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                title={alertConfig.title}
+                message={alertConfig.message}
+            />
+        </div>
+    )
+}
