@@ -46,6 +46,74 @@ function TeamNickname({ teamNumber, onNameFetched }: { teamNumber: string, onNam
     return <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-1 truncate max-w-[200px]" title={nickname}>{nickname}</span>
 }
 
+function TeamNameSearch({ query, eventKey, onSelect }: { query: string, eventKey: string, onSelect: (teamNumber: number, teamName: string) => void }) {
+    const [results, setResults] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (query.length < 2) {
+            setResults([])
+            return
+        }
+
+        const searchTeams = async () => {
+            setLoading(true)
+            try {
+                const teams = await getTBAData(`/event/${eventKey}/teams`)
+                const matches = teams
+                    .filter((t: any) =>
+                        t.nickname?.toLowerCase().includes(query.toLowerCase()) ||
+                        t.team_number?.toString().includes(query)
+                    )
+                    .slice(0, 8)
+                setResults(matches)
+            } catch (e) {
+                setResults([])
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        const timer = setTimeout(searchTeams, 300)
+        return () => clearTimeout(timer)
+    }, [query, eventKey])
+
+    if (loading) {
+        return (
+            <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-3 text-center animate-in fade-in zoom-in-95">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (results.length === 0) {
+        return (
+            <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-3 text-center text-xs text-muted-foreground italic animate-in fade-in zoom-in-95">
+                No teams found matching "{query}"
+            </div>
+        )
+    }
+
+    return (
+        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="text-[10px] uppercase font-bold text-muted-foreground px-3 py-2 bg-muted/50 border-b">
+                Select Team
+            </div>
+            {results.map((team) => (
+                <button
+                    key={team.key}
+                    type="button"
+                    onClick={() => onSelect(team.team_number, team.nickname)}
+                    className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+                >
+                    <div className="font-bold text-sm">{team.team_number} - {team.nickname}</div>
+                    <div className="text-[10px] text-muted-foreground">{team.city}, {team.state_prov}</div>
+                </button>
+            ))}
+        </div>
+    )
+}
+
 function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, onSelect: (key: string) => void }) {
     const [query, setQuery] = useState('')
     const [suggestions, setSuggestions] = useState<any[]>([])
@@ -196,6 +264,9 @@ export default function PitScoutingForm() {
         climbs_in_auto: false,
         obstacle_handling: 'None',
         drive_train: 'Swerve',
+        confidence_drive: 50,
+        confidence_shooter: 50,
+        confidence_overall: 50,
         scout_name: '',
         notes: '',
     })
@@ -284,6 +355,9 @@ export default function PitScoutingForm() {
                     climbs_in_auto: formData.climbs_in_auto,
                     obstacle_handling: formData.obstacle_handling,
                     drive_train_type: formData.drive_train,
+                    confidence_drive: formData.confidence_drive,
+                    confidence_shooter: formData.confidence_shooter,
+                    confidence_overall: formData.confidence_overall,
                     scout_name: formData.scout_name,
                     comments: formData.notes,
                 },
@@ -307,6 +381,9 @@ export default function PitScoutingForm() {
                     climbs_in_auto: false,
                     obstacle_handling: 'None',
                     drive_train: 'Swerve',
+                    confidence_drive: 50,
+                    confidence_shooter: 50,
+                    confidence_overall: 50,
                     scout_name: '',
                     notes: '',
                 })
@@ -346,8 +423,8 @@ export default function PitScoutingForm() {
                             <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0 pt-2">
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center gap-2">
-                                        <Label htmlFor="team_number">Team #</Label>
-                                        {formData.team_number && (
+                                        <Label htmlFor="team_number">Team # or Name</Label>
+                                        {formData.team_number && (/^\d+$/.test(formData.team_number)) && (
                                             <TeamNickname
                                                 teamNumber={formData.team_number}
                                                 onNameFetched={(name) => {
@@ -361,15 +438,31 @@ export default function PitScoutingForm() {
                                     <div className="relative group">
                                         <Input
                                             id="team_number"
-                                            type="number"
+                                            type="text"
                                             value={formData.team_number}
-                                            onChange={(e) => handleInputChange('team_number', e.target.value)}
-                                            placeholder="4213"
+                                            onChange={(e) => {
+                                                const value = e.target.value
+                                                handleInputChange('team_number', value)
+                                            }}
+                                            placeholder="4213 or 'Metal Cow'"
                                             className={cn(
-                                                validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
+                                                validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
                                             )}
                                         />
-                                        {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && filteredTeams.length > 0 && (
+
+                                        {/* Team name search results */}
+                                        {formData.team_number && !/^\d+$/.test(formData.team_number) && (
+                                            <TeamNameSearch
+                                                query={formData.team_number}
+                                                eventKey={formData.event_key}
+                                                onSelect={(teamNumber, teamName) => {
+                                                    handleInputChange('team_number', teamNumber.toString())
+                                                    handleInputChange('team_name', teamName)
+                                                }}
+                                            />
+                                        )}
+
+                                        {validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) && filteredTeams.length > 0 && (
                                             <div className="absolute z-10 w-full mt-1 bg-popover border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95">
                                                 <div className="text-[10px] uppercase font-bold text-muted-foreground px-3 py-2 bg-muted/50 border-b">Suggested Teams</div>
                                                 {filteredTeams.map(num => (
@@ -385,7 +478,7 @@ export default function PitScoutingForm() {
                                             </div>
                                         )}
                                     </div>
-                                    {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && (
+                                    {validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) && (
                                         <p className="text-[10px] text-destructive mt-1 font-medium">This team isn't registered for this event.</p>
                                     )}
                                 </div>
@@ -585,6 +678,61 @@ export default function PitScoutingForm() {
                                             <SelectItem value="Both">Both</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                </div>
+
+                                <div className="space-y-4 border-t pt-4">
+                                    <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Confidence Ratings</h4>
+
+                                    <div className="space-y-2">
+                                        <Label>Drive Confidence</Label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={formData.confidence_drive}
+                                            onChange={(e) => handleInputChange('confidence_drive', parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>No Confidence</span>
+                                            <span className="font-bold text-primary">{formData.confidence_drive}%</span>
+                                            <span>Very Confident</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Shooter Confidence</Label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={formData.confidence_shooter}
+                                            onChange={(e) => handleInputChange('confidence_shooter', parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>No Confidence</span>
+                                            <span className="font-bold text-primary">{formData.confidence_shooter}%</span>
+                                            <span>Very Confident</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Overall Robot Confidence</Label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={formData.confidence_overall}
+                                            onChange={(e) => handleInputChange('confidence_overall', parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>No Confidence</span>
+                                            <span className="font-bold text-primary">{formData.confidence_overall}%</span>
+                                            <span>Very Confident</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2">

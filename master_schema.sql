@@ -57,6 +57,12 @@ CREATE TABLE IF NOT EXISTS public.pit_scouting (
     climbs_in_auto BOOLEAN DEFAULT FALSE,
     obstacle_handling TEXT CHECK (obstacle_handling IN ('Trench', 'Bump', 'Both', 'None')),
     primary_role TEXT CHECK (primary_role IN ('Offense', 'Defense')),
+    
+    -- Confidence Ratings (0-100)
+    confidence_drive INTEGER CHECK (confidence_drive >= 0 AND confidence_drive <= 100),
+    confidence_shooter INTEGER CHECK (confidence_shooter >= 0 AND confidence_shooter <= 100),
+    confidence_overall INTEGER CHECK (confidence_overall >= 0 AND confidence_overall <= 100),
+    
     comments TEXT,
 
     -- Ensure we only have one profile per team per event
@@ -75,6 +81,7 @@ CREATE TABLE IF NOT EXISTS public.match_scouting (
     scout_name TEXT NOT NULL,
     team_name TEXT,
     is_practice_match BOOLEAN DEFAULT FALSE,
+    robot_on_field BOOLEAN DEFAULT TRUE,
 
     -- ⚡ Autonomous Intelligence
     start_position TEXT,
@@ -92,8 +99,8 @@ CREATE TABLE IF NOT EXISTS public.match_scouting (
     teleop_pickup_locations TEXT[], -- Array of field harvest locations
 
     -- 📉 Performance Scoring
-    defense_rating INTEGER CHECK (defense_rating >= 1 AND defense_rating <= 5),
-    accuracy_rating INTEGER CHECK (accuracy_rating >= 1 AND accuracy_rating <= 5),
+    defense_rating INTEGER CHECK (defense_rating >= 0 AND defense_rating <= 100),
+    accuracy_rating INTEGER CHECK (accuracy_rating >= 0 AND accuracy_rating <= 100),
     ranking_points_contributed INTEGER DEFAULT 0,
     robot_status TEXT DEFAULT 'Functional' CHECK (robot_status IN ('Functional', 'Partially Functional', 'Broken')),
     comments TEXT

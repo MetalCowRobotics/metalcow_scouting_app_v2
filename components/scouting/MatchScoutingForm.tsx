@@ -46,6 +46,74 @@ function TeamNickname({ teamNumber, onNameFetched }: { teamNumber: string, onNam
     return <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-1 truncate max-w-[200px]" title={nickname}>{nickname}</span>
 }
 
+function TeamNameSearch({ query, eventKey, onSelect }: { query: string, eventKey: string, onSelect: (teamNumber: number, teamName: string) => void }) {
+    const [results, setResults] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (query.length < 2) {
+            setResults([])
+            return
+        }
+
+        const searchTeams = async () => {
+            setLoading(true)
+            try {
+                const teams = await getTBAData(`/event/${eventKey}/teams`)
+                const matches = teams
+                    .filter((t: any) =>
+                        t.nickname?.toLowerCase().includes(query.toLowerCase()) ||
+                        t.team_number?.toString().includes(query)
+                    )
+                    .slice(0, 8)
+                setResults(matches)
+            } catch (e) {
+                setResults([])
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        const timer = setTimeout(searchTeams, 300)
+        return () => clearTimeout(timer)
+    }, [query, eventKey])
+
+    if (loading) {
+        return (
+            <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-3 text-center animate-in fade-in zoom-in-95">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (results.length === 0) {
+        return (
+            <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-3 text-center text-xs text-muted-foreground italic animate-in fade-in zoom-in-95">
+                No teams found matching "{query}"
+            </div>
+        )
+    }
+
+    return (
+        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="text-[10px] uppercase font-bold text-muted-foreground px-3 py-2 bg-muted/50 border-b">
+                Select Team
+            </div>
+            {results.map((team) => (
+                <button
+                    key={team.key}
+                    type="button"
+                    onClick={() => onSelect(team.team_number, team.nickname)}
+                    className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+                >
+                    <div className="font-bold text-sm">{team.team_number} - {team.nickname}</div>
+                    <div className="text-[10px] text-muted-foreground">{team.city}, {team.state_prov}</div>
+                </button>
+            ))}
+        </div>
+    )
+}
+
 function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, onSelect: (key: string) => void }) {
     const [query, setQuery] = useState('')
     const [suggestions, setSuggestions] = useState<any[]>([])
@@ -205,6 +273,7 @@ export default function MatchScoutingForm() {
         alliance: '',
         scout_name: '',
         is_practice_match: false,
+        robot_on_field: true,
 
         // Auto
         auto_preloaded: false,
@@ -222,8 +291,8 @@ export default function MatchScoutingForm() {
         teleop_pickup_locations: [] as string[],    // TODO: Multi-select implementation
 
         // Endgame
-        defense_rating: 3,
-        accuracy_rating: 3,
+        defense_rating: 50,
+        accuracy_rating: 50,
         ranking_points_contributed: 0,
         robot_status: 'Functional',
         comments: '',
@@ -278,6 +347,7 @@ export default function MatchScoutingForm() {
                     alliance: '',
                     scout_name: '',
                     is_practice_match: false,
+                    robot_on_field: true,
                     auto_preloaded: false,
                     auto_active: false,
                     auto_fuel_scored: 0,
@@ -289,8 +359,8 @@ export default function MatchScoutingForm() {
                     teleop_zone_control: 'Neutral',
                     teleop_descended_from_auto: false,
                     teleop_pickup_locations: [],
-                    defense_rating: 3,
-                    accuracy_rating: 3,
+                    defense_rating: 50,
+                    accuracy_rating: 50,
                     ranking_points_contributed: 0,
                     robot_status: 'Functional',
                     comments: '',
@@ -432,7 +502,7 @@ export default function MatchScoutingForm() {
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center gap-2">
-                                        <Label htmlFor="team_number">Team #</Label>
+                                        <Label htmlFor="team_number">Team # or Name</Label>
                                         {formData.team_number && (
                                             <TeamNickname
                                                 teamNumber={formData.team_number}
@@ -447,17 +517,38 @@ export default function MatchScoutingForm() {
                                     <div className="relative group">
                                         <Input
                                             id="team_number"
-                                            type="number"
+                                            type="text"
                                             value={formData.team_number}
-                                            onChange={(e) => handleInputChange('team_number', e.target.value)}
-                                            placeholder="254"
+                                            onChange={(e) => {
+                                                const value = e.target.value
+                                                // If it's a pure number, use it directly
+                                                if (/^\d+$/.test(value) || value === '') {
+                                                    handleInputChange('team_number', value)
+                                                } else {
+                                                    // Allow text input for team name search
+                                                    handleInputChange('team_number', value)
+                                                }
+                                            }}
+                                            placeholder="254 or 'Cheesy Poofs'"
                                             className={cn(
-                                                validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
+                                                validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
                                             )}
                                         />
 
+                                        {/* Team name search results */}
+                                        {formData.team_number && !/^\d+$/.test(formData.team_number) && (
+                                            <TeamNameSearch
+                                                query={formData.team_number}
+                                                eventKey={formData.event_key}
+                                                onSelect={(teamNumber, teamName) => {
+                                                    handleInputChange('team_number', teamNumber.toString())
+                                                    handleInputChange('team_name', teamName)
+                                                }}
+                                            />
+                                        )}
+
                                         {/* Smart Search Results */}
-                                        {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && filteredTeams.length > 0 && (
+                                        {validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) && filteredTeams.length > 0 && (
                                             <div className="absolute z-10 w-full mt-1 bg-popover border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95">
                                                 <div className="text-[10px] uppercase font-bold text-muted-foreground px-3 py-2 bg-muted/50 border-b">Suggested Teams</div>
                                                 {filteredTeams.map(num => (
@@ -473,7 +564,7 @@ export default function MatchScoutingForm() {
                                             </div>
                                         )}
                                     </div>
-                                    {validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) && (
+                                    {validTeams.length > 0 && formData.team_number && /^\d+$/.test(formData.team_number) && !validTeams.includes(parseInt(formData.team_number)) && (
                                         <p className="text-[10px] text-destructive mt-1 font-medium">This team isn't registered for this event.</p>
                                     )}
                                 </div>
@@ -519,6 +610,19 @@ export default function MatchScoutingForm() {
                                 />
                                 <Label htmlFor="practice" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                     Practice Match?
+                                </Label>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    id="robot_on_field"
+                                    checked={formData.robot_on_field}
+                                    onChange={(e) => handleInputChange('robot_on_field', e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <Label htmlFor="robot_on_field" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Robot on Field?
                                 </Label>
                             </div>
                         </div>
@@ -588,8 +692,8 @@ export default function MatchScoutingForm() {
                                     <div className="relative w-full">
                                         <div className="relative rounded-xl overflow-hidden border-2">
                                             <img
-                                                src={formData.alliance === 'Red' 
-                                                    ? '/2026-field-images/red-alliance-wall2.jpg' 
+                                                src={formData.alliance === 'Red'
+                                                    ? '/2026-field-images/red-alliance-wall2.jpg'
                                                     : '/2026-field-images/blue-alliance-wall.jpg'}
                                                 alt="Field Map"
                                                 className="w-full h-auto"
@@ -603,11 +707,10 @@ export default function MatchScoutingForm() {
                                                     key={pos.id}
                                                     type="button"
                                                     onClick={() => handleInputChange('start_position', pos.id)}
-                                                    className={`absolute px-4 py-3 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4 font-black text-sm transition-all transform hover:scale-110 shadow-lg ${
-                                                        formData.start_position === pos.id
-                                                            ? (formData.alliance === 'Red' ? 'bg-red-600 border-red-400 text-white shadow-red-600/50 scale-110' : 'bg-blue-600 border-blue-400 text-white shadow-blue-600/50 scale-110')
-                                                            : 'bg-background/90 border-muted-foreground text-muted-foreground hover:border-primary hover:bg-primary/10'
-                                                    }`}
+                                                    className={`absolute px-4 py-3 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4 font-black text-sm transition-all transform hover:scale-110 shadow-lg ${formData.start_position === pos.id
+                                                        ? (formData.alliance === 'Red' ? 'bg-red-600 border-red-400 text-white shadow-red-600/50 scale-110' : 'bg-blue-600 border-blue-400 text-white shadow-blue-600/50 scale-110')
+                                                        : 'bg-background/90 border-muted-foreground text-muted-foreground hover:border-primary hover:bg-primary/10'
+                                                        }`}
                                                     style={{ top: pos.top, left: pos.left }}
                                                 >
                                                     {pos.label}
