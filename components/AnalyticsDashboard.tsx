@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { getTBAData, TBATeam } from '@/lib/tba'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import { BarChart3, Activity, Shield, Trophy, Filter, ArrowUpDown, AlertCircle, 
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import TeamComparisonGraphs from './scouting/TeamComparisonGraphs'
 
 interface HybridTeamStat {
     team_number: number
@@ -41,10 +43,10 @@ interface HybridTeamStat {
 export default function AnalyticsDashboard() {
     const [stats, setStats] = useState<HybridTeamStat[]>([])
     const [loading, setLoading] = useState(true)
-    const [eventKey, setEventKey] = useState('2025ilpe')
+    const [eventKey, setEventKey] = useState(process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe')
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<'score' | 'fps' | 'defense'>('score')
-    const [activeTab, setActiveTab] = useState<'strategy' | 'profiles'>('strategy')
+    const [activeTab, setActiveTab] = useState<'strategy' | 'profiles' | 'graphs'>('strategy')
 
     const supabase = createClient()
 
@@ -196,6 +198,15 @@ export default function AnalyticsDashboard() {
                         >
                             <Shield className="h-4 w-4" /> Robot Profiles
                         </button>
+                        <button
+                            onClick={() => setActiveTab('graphs')}
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                                activeTab === 'graphs' ? "bg-background shadow-md text-primary" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <BarChart3 className="h-4 w-4" /> Data Visuals
+                        </button>
                     </div>
 
                     <div className="relative flex-1 md:w-64">
@@ -215,25 +226,27 @@ export default function AnalyticsDashboard() {
                     {/* Top Standings Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {filteredAndSortedStats.slice(0, 3).map((team, idx) => (
-                            <Card key={team.team_number} className="relative overflow-hidden border-2 border-primary/20 shadow-lg hover:border-primary transition-all">
-                                <div className="absolute top-0 right-0 p-4 opacity-10">
-                                    <Trophy className="h-20 w-20" />
-                                </div>
-                                <CardHeader className="pb-2">
-                                    <div className="flex justify-between items-start">
-                                        <Badge variant="outline" className="font-mono text-xl py-1 px-4 border-2 border-primary text-primary">#{team.team_number}</Badge>
-                                        <div className="text-4xl font-black text-primary/20">#{idx + 1}</div>
+                            <Link key={team.team_number} href={`/teams/${team.team_number}`}>
+                                <Card className="relative overflow-hidden border-2 border-primary/20 shadow-lg hover:border-primary transition-all cursor-pointer group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Trophy className="h-20 w-20" />
                                     </div>
-                                    <CardTitle className="text-2xl mt-4 truncate">{team.nickname || `Team ${team.team_number}`}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex justify-between items-end">
-                                        <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Avg Scored</div>
-                                        <div className="text-3xl font-black">{team.avg_actual_score.toFixed(1)}</div>
-                                    </div>
-                                    <Progress value={team.avg_actual_score * 2} className="h-2" />
-                                </CardContent>
-                            </Card>
+                                    <CardHeader className="pb-2">
+                                        <div className="flex justify-between items-start">
+                                            <Badge variant="outline" className="font-mono text-xl py-1 px-4 border-2 border-primary text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">#{team.team_number}</Badge>
+                                            <div className="text-4xl font-black text-primary/20">#{idx + 1}</div>
+                                        </div>
+                                        <CardTitle className="text-2xl mt-4 truncate">{team.nickname || `Team ${team.team_number}`}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Avg Scored</div>
+                                            <div className="text-3xl font-black">{team.avg_actual_score.toFixed(1)}</div>
+                                        </div>
+                                        <Progress value={team.avg_actual_score * 2} className="h-2" />
+                                    </CardContent>
+                                </Card>
+                            </Link>
                         ))}
                     </div>
 
@@ -260,8 +273,10 @@ export default function AnalyticsDashboard() {
                                     return (
                                         <TableRow key={team.team_number} className="hover:bg-muted/30 transition-colors">
                                             <TableCell>
-                                                <div className="font-black text-lg">{team.team_number}</div>
-                                                <div className="text-[10px] text-muted-foreground truncate max-w-[80px]">{team.nickname}</div>
+                                                <Link href={`/teams/${team.team_number}`} className="group block">
+                                                    <div className="font-black text-lg group-hover:text-primary transition-colors">#{team.team_number}</div>
+                                                    <div className="text-[10px] text-muted-foreground truncate max-w-[80px] group-hover:text-primary/70 transition-colors">{team.nickname}</div>
+                                                </Link>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-4">
@@ -306,97 +321,101 @@ export default function AnalyticsDashboard() {
                         </Table>
                     </Card>
                 </div>
-            ) : (
+            ) : activeTab === 'profiles' ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-in fade-in slide-in-from-right-8 duration-500">
                     {filteredAndSortedStats.map((team) => (
-                        <Card key={team.team_number} className="overflow-hidden border-2 hover:border-primary transition-all group shadow-lg">
-                            <CardHeader className="bg-primary/5 pb-4 border-b">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <CardTitle className="text-3xl font-black">#{team.team_number}</CardTitle>
-                                            {team.is_tba_verified && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                        <Link key={team.team_number} href={`/teams/${team.team_number}`}>
+                            <Card className="overflow-hidden border-2 hover:border-primary transition-all group shadow-lg cursor-pointer">
+                                <CardHeader className="bg-primary/5 pb-4 border-b group-hover:bg-primary/10 transition-colors">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="text-3xl font-black">#{team.team_number}</CardTitle>
+                                                {team.is_tba_verified && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                                            </div>
+                                            <p className="text-sm font-bold text-primary italic">
+                                                {team.nickname || 'Unknown Team'}
+                                            </p>
                                         </div>
-                                        <p className="text-sm font-bold text-primary italic">
-                                            {team.nickname || 'Unknown Team'}
-                                        </p>
+                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black tracking-widest uppercase py-1 px-3">
+                                            {team.state_prov || 'N/A'}
+                                        </Badge>
                                     </div>
-                                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black tracking-widest uppercase py-1 px-3">
-                                        {team.state_prov || 'N/A'}
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-6 space-y-6">
-                                {/* Stats Grid */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
-                                        <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
-                                            <Weight className="h-3 w-3" /> Weight
+                                </CardHeader>
+                                <CardContent className="pt-6 space-y-6">
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
+                                            <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
+                                                <Weight className="h-3 w-3" /> Weight
+                                            </div>
+                                            <div className="text-lg font-black">{team.robot_weight || '0'} lb</div>
                                         </div>
-                                        <div className="text-lg font-black">{team.robot_weight || '0'} lb</div>
-                                    </div>
-                                    <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
-                                        <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
-                                            <Gauge className="h-3 w-3" /> Top Speed
+                                        <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
+                                            <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
+                                                <Gauge className="h-3 w-3" /> Top Speed
+                                            </div>
+                                            <div className="text-lg font-black">{team.top_speed || '0'} <span className="text-[10px]">ft/s</span></div>
                                         </div>
-                                        <div className="text-lg font-black">{team.top_speed || '0'} <span className="text-[10px]">ft/s</span></div>
-                                    </div>
-                                    <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
-                                        <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
-                                            <Zap className="h-3 w-3" /> Theoretical
+                                        <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
+                                            <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
+                                                <Zap className="h-3 w-3" /> Theoretical
+                                            </div>
+                                            <div className="text-lg font-black">{team.theoretical_fps?.toFixed(1) || '0'} <span className="text-[10px]">f/sec</span></div>
                                         </div>
-                                        <div className="text-lg font-black">{team.theoretical_fps?.toFixed(1) || '0'} <span className="text-[10px]">f/sec</span></div>
-                                    </div>
-                                    <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
-                                        <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
-                                            <ArrowUpCircle className="h-3 w-3" /> Climb
+                                        <div className="p-3 rounded-xl bg-muted/30 border space-y-1">
+                                            <div className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2">
+                                                <ArrowUpCircle className="h-3 w-3" /> Climb
+                                            </div>
+                                            <div className="text-lg font-black">{team.climb_level ? `Level ${team.climb_level}` : 'None'}</div>
                                         </div>
-                                        <div className="text-lg font-black">{team.climb_level ? `Level ${team.climb_level}` : 'None'}</div>
                                     </div>
-                                </div>
 
-                                {/* Secondary Details */}
-                                <div className="space-y-3 pt-2">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Drive Train</span>
-                                        <Badge variant="outline" className="font-black border-2">{team.drive_train || 'Unk'}</Badge>
+                                    {/* Secondary Details */}
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Drive Train</span>
+                                            <Badge variant="outline" className="font-black border-2">{team.drive_train || 'Unk'}</Badge>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Primary Role</span>
+                                            <Badge className="font-black">{team.primary_role || 'Unk'}</Badge>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Obstacle Handling</span>
+                                            <span className="font-black text-primary italic uppercase">{team.obstacle_handling || 'N/A'}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Primary Role</span>
-                                        <Badge className="font-black">{team.primary_role || 'Unk'}</Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="font-extrabold text-muted-foreground uppercase tracking-widest">Obstacle Handling</span>
-                                        <span className="font-black text-primary italic uppercase">{team.obstacle_handling || 'N/A'}</span>
-                                    </div>
-                                </div>
 
-                                {team.pit_comments && (
-                                    <div className="bg-muted/30 p-4 rounded-xl border border-dashed relative">
-                                        <div className="text-[9px] font-black absolute -top-2 left-3 bg-background px-2 border rounded uppercase">Pit Notes</div>
-                                        <p className="text-xs italic text-muted-foreground leading-relaxed">
-                                            "{team.pit_comments}"
-                                        </p>
-                                    </div>
-                                )}
+                                    {team.pit_comments && (
+                                        <div className="bg-muted/30 p-4 rounded-xl border border-dashed relative">
+                                            <div className="text-[9px] font-black absolute -top-2 left-3 bg-background px-2 border rounded uppercase">Pit Notes</div>
+                                            <p className="text-xs italic text-muted-foreground leading-relaxed">
+                                                "{team.pit_comments}"
+                                            </p>
+                                        </div>
+                                    )}
 
-                                <div className="pt-4 border-t flex justify-between items-center text-[10px] font-bold text-muted-foreground">
-                                    <div className="flex gap-2">
-                                        <span className={cn("px-2 py-0.5 rounded", team.climbs_in_auto ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground")}>
-                                            {team.climbs_in_auto ? "AUTO CLIMB ✓" : "NO AUTO CLIMB"}
-                                        </span>
-                                        <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 uppercase">
-                                            CAP: {team.fuel_capacity || '0'}
-                                        </span>
+                                    <div className="pt-4 border-t flex justify-between items-center text-[10px] font-bold text-muted-foreground">
+                                        <div className="flex gap-2">
+                                            <span className={cn("px-2 py-0.5 rounded", team.climbs_in_auto ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground")}>
+                                                {team.climbs_in_auto ? "AUTO CLIMB ✓" : "NO AUTO CLIMB"}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 uppercase">
+                                                CAP: {team.fuel_capacity || '0'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 group-hover:text-primary transition-colors">
+                                            VIEW PROFILE <ChevronRight className="h-3 w-3" />
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1 group-hover:text-primary transition-colors cursor-pointer">
-                                        VIEW DETAILS <ChevronRight className="h-3 w-3" />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        </Link>
                     ))}
                 </div>
+            ) : (
+                <TeamComparisonGraphs stats={filteredAndSortedStats} />
             )}
 
             {/* Bottom Row: Additional Data */}
@@ -426,7 +445,7 @@ export default function AnalyticsDashboard() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {stats.sort((a, b) => b.avg_defense - a.avg_defense).slice(0, 5).map(t => (
+                        {[...stats].sort((a, b) => b.avg_defense - a.avg_defense).slice(0, 5).map(t => (
                             <div key={t.team_number} className="flex justify-between items-center p-2 rounded-lg bg-muted/50 border">
                                 <span className="font-black">Team {t.team_number}</span>
                                 <div className="flex gap-1">

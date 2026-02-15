@@ -7,11 +7,13 @@ import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
-import { Bot, BarChart2, ScrollText, Users, Globe } from 'lucide-react'
+import { Bot, BarChart2, ScrollText, Users, Globe, Shield } from 'lucide-react'
+
+import { isAdmin } from '@/lib/admin'
 
 export function Navbar() {
     const pathname = usePathname()
-    const [user, setUser] = useState<any>(null) // TODO: Type properly if needed
+    const [user, setUser] = useState<any>(null)
     const supabase = createClient()
 
     useEffect(() => {
@@ -33,33 +35,17 @@ export function Navbar() {
         setUser(null)
     }
 
-    const routes = [
-        {
-            href: '/',
-            label: 'Home',
-            icon: Users,
-        },
-        {
-            href: '/scout/match',
-            label: 'Match Scout',
-            icon: ScrollText,
-        },
-        {
-            href: '/scout/pit',
-            label: 'Pit Scout',
-            icon: Bot,
-        },
-        {
-            href: '/analytics',
-            label: 'Analytics',
-            icon: BarChart2,
-        },
-        {
-            href: '/tba',
-            label: 'TBA Data',
-            icon: Globe,
-        },
+    const baseRoutes = [
+        { href: '/', label: 'Home', icon: Users },
+        { href: '/scout/match', label: 'Match Scout', icon: ScrollText },
+        { href: '/scout/pit', label: 'Pit Scout', icon: Bot },
+        { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+        { href: '/tba', label: 'TBA Data', icon: Globe },
     ]
+
+    const routes = isAdmin(user?.email)
+        ? [...baseRoutes, { href: '/admin', label: 'Admin', icon: Shield }]
+        : baseRoutes
 
     return (
         <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">

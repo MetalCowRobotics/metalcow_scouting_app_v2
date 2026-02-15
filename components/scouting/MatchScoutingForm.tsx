@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -11,41 +12,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import { getTBAData } from '@/lib/tba'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogMedia,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { AlertModal } from '@/components/ui/AlertModal'
 
-function AlertModal({ isOpen, onClose, title, message }: { isOpen: boolean, onClose: () => void, title: string, message: string }) {
-    return (
-        <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogMedia className="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500">
-                        <AlertTriangle className="h-6 w-6" />
-                    </AlertDialogMedia>
-                    <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {message}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogAction onClick={onClose} className="bg-amber-600 hover:bg-amber-700 text-white">
-                        Got it
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    )
-}
-
-function TeamNickname({ teamNumber }: { teamNumber: string }) {
+function TeamNickname({ teamNumber, onNameFetched }: { teamNumber: string, onNameFetched?: (name: string) => void }) {
     const [nickname, setNickname] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
 
@@ -59,6 +28,9 @@ function TeamNickname({ teamNumber }: { teamNumber: string }) {
             try {
                 const data = await getTBAData(`/team/frc${teamNumber}`)
                 setNickname(data.nickname)
+                if (data.nickname && onNameFetched) {
+                    onNameFetched(data.nickname)
+                }
             } catch (e) {
                 setNickname(null)
             } finally {
@@ -67,7 +39,7 @@ function TeamNickname({ teamNumber }: { teamNumber: string }) {
         }
         const timer = setTimeout(fetchTBA, 500)
         return () => clearTimeout(timer)
-    }, [teamNumber])
+    }, [teamNumber, onNameFetched])
 
     if (loading) return <Loader2 className="h-3 w-3 animate-spin opacity-40 ml-2" />
     if (!nickname) return null
@@ -92,11 +64,12 @@ function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, o
                 const events = await getTBAData(`/events/${year}/simple`)
                 const matches = events
                     .filter((e: any) =>
-                        e.name.toLowerCase().includes(query.toLowerCase()) ||
-                        e.city.toLowerCase().includes(query.toLowerCase()) ||
-                        e.state_prov?.toLowerCase().includes(query.toLowerCase())
+                        (e.name?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.city?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.state_prov?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.key?.toLowerCase() || '').includes(query.toLowerCase())
                     )
-                    .slice(0, 5)
+                    .slice(0, 10)
                 setSuggestions(matches)
             } catch (e) {
                 setSuggestions([])
@@ -152,6 +125,12 @@ function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, o
                             ))}
                         </div>
                     )}
+
+                    {query.length >= 3 && suggestions.length === 0 && !loading && (
+                        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-4 text-center text-xs text-muted-foreground italic animate-in fade-in slide-in-from-top-2">
+                            No events found for "{query}" in {year}.
+                        </div>
+                    )}
                 </div>
             </div>
             {currentEventKey && (
@@ -176,10 +155,35 @@ const STEPS = {
 }
 
 export default function MatchScoutingForm() {
+    const searchParams = useSearchParams()
+    const teamParam = searchParams.get('team')
+
     const [step, setStep] = useState(STEPS.PREMATCH)
     const [loading, setLoading] = useState(false)
     const [increment, setIncrement] = useState(1)
     const [validTeams, setValidTeams] = useState<number[]>([])
+    const supabase = createClient()
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const firstName = session?.user?.user_metadata?.first_name
+            const fullName = session?.user?.user_metadata?.full_name
+            const email = session?.user?.email
+
+            if (firstName) {
+                setFormData(prev => ({ ...prev, scout_name: firstName }))
+            } else if (fullName) {
+                setFormData(prev => ({ ...prev, scout_name: fullName }))
+            } else if (email) {
+                setFormData(prev => ({
+                    ...prev,
+                    scout_name: email.split('@')[0] || email
+                }))
+            }
+        }
+        fetchUser()
+    }, [supabase])
 
     // Alert Modal State
     const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({
@@ -195,8 +199,9 @@ export default function MatchScoutingForm() {
     const [formData, setFormData] = useState({
         // Meta
         match_number: '',
-        team_number: '',
-        event_key: '2025ilpe',
+        team_number: teamParam || '',
+        team_name: '',
+        event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
         alliance: '',
         scout_name: '',
         is_practice_match: false,
@@ -214,8 +219,6 @@ export default function MatchScoutingForm() {
         teleop_fuel_scored: 0,
         teleop_zone_control: 'Neutral',
         teleop_descended_from_auto: false,
-        teleop_fuel_shuttled_start: '', // Simplified for MVP
-        teleop_fuel_shuttled_end: '',   // Simplified for MVP
         teleop_pickup_locations: [] as string[],    // TODO: Multi-select implementation
 
         // Endgame
@@ -244,8 +247,6 @@ export default function MatchScoutingForm() {
         }
     }, [formData.event_key])
 
-    const supabase = createClient()
-
     const handleInputChange = (field: string, value: any) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
@@ -264,15 +265,16 @@ export default function MatchScoutingForm() {
 
             if (error) {
                 console.error('Error submitting match data:', error)
-                alert('Error submitting data: ' + error.message)
+                showAlert('Submission Error', 'Error submitting data: ' + error.message)
             } else {
-                alert('Match data submitted successfully!')
+                showAlert('Success!', 'Match data submitted successfully!')
                 // Reset form or redirect
                 setStep(STEPS.PREMATCH)
                 setFormData({
                     match_number: '',
                     team_number: '',
-                    event_key: '2025ilpe',
+                    team_name: '',
+                    event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
                     alliance: '',
                     scout_name: '',
                     is_practice_match: false,
@@ -286,8 +288,6 @@ export default function MatchScoutingForm() {
                     teleop_fuel_scored: 0,
                     teleop_zone_control: 'Neutral',
                     teleop_descended_from_auto: false,
-                    teleop_fuel_shuttled_start: '',
-                    teleop_fuel_shuttled_end: '',
                     teleop_pickup_locations: [],
                     defense_rating: 3,
                     accuracy_rating: 3,
@@ -298,7 +298,7 @@ export default function MatchScoutingForm() {
             }
         } catch (err) {
             console.error('Unexpected error:', err)
-            alert('Unexpected error occurred.')
+            showAlert('System Error', 'Unexpected error occurred during submission.')
         } finally {
             setLoading(false)
         }
@@ -308,7 +308,7 @@ export default function MatchScoutingForm() {
     useEffect(() => {
         const detectEvent = async (lat: number, lon: number) => {
             try {
-                const year = 2025 // Using the user's requested season
+                const year = 2026 // Using the user's requested season
                 const events = await getTBAData(`/events/${year}`)
                 const now = new Date()
 
@@ -371,6 +371,16 @@ export default function MatchScoutingForm() {
                 showAlert('Position Required', 'You must select a starting position for the robot before entering the Teleop phase.');
                 return false;
             }
+            if (formData.auto_fuel_scored < 0 || formData.auto_fuel_scored > 500) {
+                showAlert('Implausible Value', 'Auto fuel scored must be between 0 and 500.');
+                return false;
+            }
+        }
+        if (step === STEPS.TELEOP) {
+            if (formData.teleop_fuel_scored < 0 || formData.teleop_fuel_scored > 1000) {
+                showAlert('Implausible Value', 'Teleop fuel scored must be between 0 and 1000.');
+                return false;
+            }
         }
         return true;
     };
@@ -413,6 +423,8 @@ export default function MatchScoutingForm() {
                                     <Input
                                         id="match_number"
                                         type="number"
+                                        min="1"
+                                        max="300"
                                         value={formData.match_number}
                                         onChange={(e) => handleInputChange('match_number', e.target.value)}
                                         placeholder="1"
@@ -422,7 +434,14 @@ export default function MatchScoutingForm() {
                                     <div className="flex justify-between items-center gap-2">
                                         <Label htmlFor="team_number">Team #</Label>
                                         {formData.team_number && (
-                                            <TeamNickname teamNumber={formData.team_number} />
+                                            <TeamNickname
+                                                teamNumber={formData.team_number}
+                                                onNameFetched={(name) => {
+                                                    if (!formData.team_name) {
+                                                        handleInputChange('team_name', name)
+                                                    }
+                                                }}
+                                            />
                                         )}
                                     </div>
                                     <div className="relative group">
@@ -555,25 +574,52 @@ export default function MatchScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="500"
                                             value={formData.auto_fuel_scored}
-                                            onChange={(e) => handleInputChange('auto_fuel_scored', parseInt(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('auto_fuel_scored', Math.min(500, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('auto_fuel_scored', formData.auto_fuel_scored + increment)}>+</Button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Start Position</Label>
-                                    <Select onValueChange={(val) => handleInputChange('start_position', val || '')} value={formData.start_position || ''}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Position" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Left">Left</SelectItem>
-                                            <SelectItem value="Center">Center</SelectItem>
-                                            <SelectItem value="Right">Right</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Label>Start Position - Click on the field to select</Label>
+                                    <div className="relative w-full">
+                                        <div className="relative rounded-xl overflow-hidden border-2">
+                                            <img
+                                                src={formData.alliance === 'Red' 
+                                                    ? '/2026-field-images/red-alliance-wall2.jpg' 
+                                                    : '/2026-field-images/blue-alliance-wall.jpg'}
+                                                alt="Field Map"
+                                                className="w-full h-auto"
+                                            />
+                                            {[
+                                                { id: 'Left', label: 'Left', top: '75%', left: '17%' },
+                                                { id: 'Center', label: 'Center', top: '75%', left: '50%' },
+                                                { id: 'Right', label: 'Right', top: '75%', left: '83%' },
+                                            ].map((pos) => (
+                                                <button
+                                                    key={pos.id}
+                                                    type="button"
+                                                    onClick={() => handleInputChange('start_position', pos.id)}
+                                                    className={`absolute px-4 py-3 -translate-x-1/2 -translate-y-1/2 rounded-xl border-4 font-black text-sm transition-all transform hover:scale-110 shadow-lg ${
+                                                        formData.start_position === pos.id
+                                                            ? (formData.alliance === 'Red' ? 'bg-red-600 border-red-400 text-white shadow-red-600/50 scale-110' : 'bg-blue-600 border-blue-400 text-white shadow-blue-600/50 scale-110')
+                                                            : 'bg-background/90 border-muted-foreground text-muted-foreground hover:border-primary hover:bg-primary/10'
+                                                    }`}
+                                                    style={{ top: pos.top, left: pos.left }}
+                                                >
+                                                    {pos.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="mt-2 flex justify-center gap-8 text-xs text-muted-foreground">
+                                            <span className={formData.start_position === 'Left' ? (formData.alliance === 'Blue' ? 'text-blue-600' : 'text-red-600') + ' font-bold' : ''}>Left</span>
+                                            <span className={formData.start_position === 'Center' ? 'text-primary font-bold' : ''}>Center</span>
+                                            <span className={formData.start_position === 'Right' ? (formData.alliance === 'Blue' ? 'text-blue-600' : 'text-red-600') + ' font-bold' : ''}>Right</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -620,8 +666,10 @@ export default function MatchScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="1000"
                                             value={formData.teleop_fuel_scored}
-                                            onChange={(e) => handleInputChange('teleop_fuel_scored', parseInt(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('teleop_fuel_scored', Math.min(1000, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('teleop_fuel_scored', formData.teleop_fuel_scored + increment)}>+</Button>
                                     </div>
@@ -650,30 +698,6 @@ export default function MatchScoutingForm() {
                                     onChange={(e) => handleInputChange('teleop_descended_from_auto', e.target.checked)}
                                     className="h-5 w-5"
                                 />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Shuttle Start</Label>
-                                    <Select onValueChange={(val) => handleInputChange('teleop_fuel_shuttled_start', val)} value={formData.teleop_fuel_shuttled_start}>
-                                        <SelectTrigger><SelectValue placeholder="Loc" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Source">Source</SelectItem>
-                                            <SelectItem value="Ground">Ground</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Shuttle End</Label>
-                                    <Select onValueChange={(val) => handleInputChange('teleop_fuel_shuttled_end', val)} value={formData.teleop_fuel_shuttled_end}>
-                                        <SelectTrigger><SelectValue placeholder="Loc" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Amp">Amp</SelectItem>
-                                            <SelectItem value="Speaker">Speaker</SelectItem>
-                                            <SelectItem value="Trap">Trap</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -707,11 +731,11 @@ export default function MatchScoutingForm() {
 
                             <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
                                 <div className="space-y-2">
-                                    <Label>Defense Rating (1-5)</Label>
+                                    <Label>Defense Rating</Label>
                                     <input
                                         type="range"
-                                        min="1"
-                                        max="5"
+                                        min="0"
+                                        max="100"
                                         value={formData.defense_rating}
                                         onChange={(e) => handleInputChange('defense_rating', parseInt(e.target.value))}
                                         className="w-full"
@@ -724,15 +748,20 @@ export default function MatchScoutingForm() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Accuracy Rating (1-5)</Label>
+                                    <Label>Accuracy Rating</Label>
                                     <input
                                         type="range"
-                                        min="1"
-                                        max="5"
+                                        min="0"
+                                        max="100"
                                         value={formData.accuracy_rating}
                                         onChange={(e) => handleInputChange('accuracy_rating', parseInt(e.target.value))}
                                         className="w-full"
                                     />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>Poor</span>
+                                        <span>Average</span>
+                                        <span>Excellent</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -751,11 +780,21 @@ export default function MatchScoutingForm() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Comments</Label>
+                                <div className="flex justify-between items-center">
+                                    <Label>Comments</Label>
+                                    <span className={cn(
+                                        "text-[10px] font-bold uppercase tracking-wider",
+                                        formData.comments.length >= 180 ? "text-destructive" : "text-muted-foreground"
+                                    )}>
+                                        {formData.comments.length}/200
+                                    </span>
+                                </div>
                                 <Textarea
                                     placeholder="Any observations..."
                                     value={formData.comments}
                                     onChange={(e) => handleInputChange('comments', e.target.value)}
+                                    maxLength={200}
+                                    className="resize-none h-24"
                                 />
                             </div>
                         </div>

@@ -33,7 +33,7 @@ export default function Home() {
                         <div className="h-12 w-12 bg-orange-500/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
                             <Database className="h-6 w-6 text-orange-600" />
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Pit Data</h3>
+                        <h3 className="text-xl font-bold mb-2">Pit Scout</h3>
                         <p className="text-muted-foreground text-sm">View robot specifications, drivetrain types, and capabilities.</p>
                     </div>
                 </Link>

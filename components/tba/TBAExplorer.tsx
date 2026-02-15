@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { getTBAData, TBATeam, TBAEvent, TBAMatch } from '@/lib/tba'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, Calendar, MapPin, Users, Trophy } from 'lucide-react'
 
 export default function TBAExplorer() {
-    const [searchQuery, setSearchQuery] = useState('2024ilch') // Default to Midwest Regional
+    const [searchQuery, setSearchQuery] = useState(process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe') // Default event from env
     const [loading, setLoading] = useState(false)
     const [activeTab, setActiveTab] = useState<'teams' | 'matches'>('teams')
     const [event, setEvent] = useState<TBAEvent | null>(null)
@@ -127,12 +128,14 @@ export default function TBAExplorer() {
                                 <div className="p-6">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                                         {teams.map(team => (
-                                            <div key={team.key} className="p-3 border rounded-xl bg-background hover:border-primary transition-all cursor-default group">
-                                                <div className="text-lg font-bold text-primary group-hover:scale-110 transition-transform">{team.team_number}</div>
-                                                <div className="text-[10px] text-muted-foreground font-medium truncate uppercase tracking-tighter" title={team.nickname}>
-                                                    {team.nickname}
+                                            <Link key={team.key} href={`/teams/${team.team_number}`}>
+                                                <div className="p-4 border-2 rounded-2xl bg-background hover:border-primary hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group text-center">
+                                                    <div className="text-2xl font-black text-primary group-hover:scale-110 transition-transform">#{team.team_number}</div>
+                                                    <div className="text-[10px] text-muted-foreground font-black truncate uppercase tracking-widest mt-1" title={team.nickname}>
+                                                        {team.nickname}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         ))}
                                     </div>
                                 </div>
@@ -140,40 +143,53 @@ export default function TBAExplorer() {
 
                             {activeTab === 'matches' && (
                                 <div className="p-6">
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         {matches.slice(0, 100).map(match => (
-                                            <div key={match.key} className="flex items-center border rounded-lg overflow-hidden h-12">
-                                                <div className="w-20 bg-muted flex items-center justify-center text-xs font-bold uppercase shrink-0 border-r">
-                                                    {match.comp_level}{match.match_number}
+                                            <div key={match.key} className="flex items-center border-2 rounded-2xl overflow-hidden h-14 bg-muted/10">
+                                                <div className="w-24 bg-muted flex flex-col items-center justify-center text-[10px] font-black uppercase shrink-0 border-r-2 h-full">
+                                                    <span className="text-muted-foreground">{match.comp_level}</span>
+                                                    <span className="text-lg leading-none">{match.match_number}</span>
                                                 </div>
-                                                <div className="flex-1 flex px-4 items-center justify-between gap-4">
-                                                    <div className="flex gap-2">
-                                                        {match.alliances.red.team_keys.map(tk => (
-                                                            <span key={tk} className="text-sm font-medium text-red-600 dark:text-red-400">
-                                                                {tk.replace('frc', '')}
-                                                            </span>
-                                                        ))}
+                                                <div className="flex-1 flex px-6 items-center justify-between gap-4">
+                                                    <div className="flex gap-4">
+                                                        {match.alliances.red.team_keys.map(tk => {
+                                                            const num = tk.replace('frc', '')
+                                                            return (
+                                                                <Link key={tk} href={`/teams/${num}`} className="text-sm font-black text-rose-600 hover:underline underline-offset-4 decoration-2">
+                                                                    {num}
+                                                                </Link>
+                                                            )
+                                                        })}
                                                     </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className={`text-sm font-bold ${match.winning_alliance === 'red' ? 'text-red-600 underline decoration-2' : ''}`}>
+                                                    <div className="flex items-center gap-4 bg-background px-4 py-1 rounded-full border-2">
+                                                        <span className={`text-lg font-black ${match.winning_alliance === 'red' ? 'text-rose-600' : ''}`}>
                                                             {match.alliances.red.score}
                                                         </span>
-                                                        <span className="text-muted-foreground opacity-30">—</span>
-                                                        <span className={`text-sm font-bold ${match.winning_alliance === 'blue' ? 'text-blue-600 underline decoration-2' : ''}`}>
+                                                        <span className="text-muted-foreground font-black">—</span>
+                                                        <span className={`text-lg font-black ${match.winning_alliance === 'blue' ? 'text-blue-600' : ''}`}>
                                                             {match.alliances.blue.score}
                                                         </span>
                                                     </div>
-                                                    <div className="flex gap-2 justify-end">
-                                                        {match.alliances.blue.team_keys.map(tk => (
-                                                            <span key={tk} className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                                                {tk.replace('frc', '')}
-                                                            </span>
-                                                        ))}
+                                                    <div className="flex gap-4 justify-end">
+                                                        {match.alliances.blue.team_keys.map(tk => {
+                                                            const num = tk.replace('frc', '')
+                                                            return (
+                                                                <Link key={tk} href={`/teams/${num}`} className="text-sm font-black text-blue-600 hover:underline underline-offset-4 decoration-2">
+                                                                    {num}
+                                                                </Link>
+                                                            )
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
-                                        {matches.length > 100 && <p className="text-center text-xs text-muted-foreground pt-4">Showing first 100 matches...</p>}
+                                        {matches.length > 100 && (
+                                            <div className="pt-6 text-center">
+                                                <Badge variant="outline" className="font-black text-[10px] uppercase tracking-widest opacity-50">
+                                                    Showing first 100 matches
+                                                </Badge>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

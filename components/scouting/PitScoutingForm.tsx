@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -11,41 +12,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, AlertTriangle, MapPin, Gauge, Weight, ArrowUpCircle, Zap, Shield, Settings, Activity } from 'lucide-react'
 import { getTBAData } from '@/lib/tba'
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogMedia,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { AlertModal } from '@/components/ui/AlertModal'
 
-function AlertModal({ isOpen, onClose, title, message }: { isOpen: boolean, onClose: () => void, title: string, message: string }) {
-    return (
-        <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogMedia className="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500">
-                        <AlertTriangle className="h-6 w-6" />
-                    </AlertDialogMedia>
-                    <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {message}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogAction onClick={onClose} className="bg-amber-600 hover:bg-amber-700 text-white">
-                        Got it
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    )
-}
-
-function TeamNickname({ teamNumber }: { teamNumber: string }) {
+function TeamNickname({ teamNumber, onNameFetched }: { teamNumber: string, onNameFetched?: (name: string) => void }) {
     const [nickname, setNickname] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
 
@@ -59,6 +28,9 @@ function TeamNickname({ teamNumber }: { teamNumber: string }) {
             try {
                 const data = await getTBAData(`/team/frc${teamNumber}`)
                 setNickname(data.nickname)
+                if (data.nickname && onNameFetched) {
+                    onNameFetched(data.nickname)
+                }
             } catch (e) {
                 setNickname(null)
             } finally {
@@ -67,7 +39,7 @@ function TeamNickname({ teamNumber }: { teamNumber: string }) {
         }
         const timer = setTimeout(fetchTBA, 500)
         return () => clearTimeout(timer)
-    }, [teamNumber])
+    }, [teamNumber, onNameFetched])
 
     if (loading) return <Loader2 className="h-3 w-3 animate-spin opacity-40 ml-2" />
     if (!nickname) return null
@@ -91,11 +63,12 @@ function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, o
                 const events = await getTBAData(`/events/${year}/simple`)
                 const matches = events
                     .filter((e: any) =>
-                        e.name.toLowerCase().includes(query.toLowerCase()) ||
-                        e.city.toLowerCase().includes(query.toLowerCase()) ||
-                        e.state_prov?.toLowerCase().includes(query.toLowerCase())
+                        (e.name?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.city?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.state_prov?.toLowerCase() || '').includes(query.toLowerCase()) ||
+                        (e.key?.toLowerCase() || '').includes(query.toLowerCase())
                     )
-                    .slice(0, 5)
+                    .slice(0, 10)
                 setSuggestions(matches)
             } catch (e) {
                 setSuggestions([])
@@ -173,6 +146,9 @@ const STEPS = {
 }
 
 export default function PitScoutingForm() {
+    const searchParams = useSearchParams()
+    const teamParam = searchParams.get('team')
+
     const [step, setStep] = useState(STEPS.IDENTITY)
     const [loading, setLoading] = useState(false)
     const [increment, setIncrement] = useState(1)
@@ -185,9 +161,32 @@ export default function PitScoutingForm() {
         message: ''
     })
 
+    const supabase = createClient()
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const firstName = session?.user?.user_metadata?.first_name
+            const fullName = session?.user?.user_metadata?.full_name
+            const email = session?.user?.email
+            if (firstName) {
+                setFormData(prev => ({ ...prev, scout_name: firstName }))
+            } else if (fullName) {
+                setFormData(prev => ({ ...prev, scout_name: fullName }))
+            } else if (email) {
+                setFormData(prev => ({
+                    ...prev,
+                    scout_name: email.split('@')[0] || email
+                }))
+            }
+        }
+        fetchUser()
+    }, [supabase])
+
     const [formData, setFormData] = useState({
-        team_number: '',
-        event_key: '2025ilpe',
+        team_number: teamParam || '',
+        team_name: '',
+        event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
         weight: 0,
         fuel_capacity: 0,
         top_speed: 0,
@@ -205,7 +204,6 @@ export default function PitScoutingForm() {
         setAlertConfig({ open: true, title, message })
     }
 
-    const supabase = createClient()
 
     // Fetch valid teams for the event
     useEffect(() => {
@@ -239,6 +237,26 @@ export default function PitScoutingForm() {
                 return false;
             }
         }
+        if (step === STEPS.PHYSICAL) {
+            if (formData.weight < 0 || formData.weight > 135) {
+                showAlert('Implausible Weight', 'Robot weight must be between 0 and 135 lbs.');
+                return false;
+            }
+            if (formData.top_speed < 0 || formData.top_speed > 30) {
+                showAlert('Implausible Speed', 'Top speed must be between 0 and 30 ft/s.');
+                return false;
+            }
+        }
+        if (step === STEPS.SCORING) {
+            if (formData.fuel_capacity < 0 || formData.fuel_capacity > 500) {
+                showAlert('Implausible Capacity', 'Fuel capacity must be between 0 and 500.');
+                return false;
+            }
+            if (formData.fuel_per_second < 0 || formData.fuel_per_second > 50) {
+                showAlert('Implausible Rate', 'Fuel per second must be between 0 and 50.');
+                return false;
+            }
+        }
         return true;
     }
 
@@ -255,6 +273,7 @@ export default function PitScoutingForm() {
             const { error } = await supabase.from('pit_scouting').upsert([
                 {
                     team_number: parseInt(formData.team_number),
+                    team_name: formData.team_name,
                     event_key: formData.event_key,
                     robot_weight: formData.weight,
                     fuel_capacity: formData.fuel_capacity,
@@ -273,11 +292,12 @@ export default function PitScoutingForm() {
             if (error) {
                 showAlert('Submission Error', error.message)
             } else {
-                alert('Pit data locked in successfully!')
+                showAlert('Success!', 'Pit data locked in successfully!')
                 setStep(STEPS.IDENTITY)
                 setFormData({
                     team_number: '',
-                    event_key: '2025ilpe',
+                    team_name: '',
+                    event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
                     weight: 0,
                     fuel_capacity: 0,
                     top_speed: 0,
@@ -328,7 +348,14 @@ export default function PitScoutingForm() {
                                     <div className="flex justify-between items-center gap-2">
                                         <Label htmlFor="team_number">Team #</Label>
                                         {formData.team_number && (
-                                            <TeamNickname teamNumber={formData.team_number} />
+                                            <TeamNickname
+                                                teamNumber={formData.team_number}
+                                                onNameFetched={(name) => {
+                                                    if (!formData.team_name) {
+                                                        handleInputChange('team_name', name)
+                                                    }
+                                                }}
+                                            />
                                         )}
                                     </div>
                                     <div className="relative group">
@@ -337,7 +364,7 @@ export default function PitScoutingForm() {
                                             type="number"
                                             value={formData.team_number}
                                             onChange={(e) => handleInputChange('team_number', e.target.value)}
-                                            placeholder="254"
+                                            placeholder="4213"
                                             className={cn(
                                                 validTeams.length > 0 && formData.team_number && !validTeams.includes(parseInt(formData.team_number)) ? "border-destructive focus-visible:ring-destructive" : ""
                                             )}
@@ -403,8 +430,10 @@ export default function PitScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="200"
                                             value={formData.weight}
-                                            onChange={(e) => handleInputChange('weight', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('weight', Math.min(200, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('weight', formData.weight + increment)}>+</Button>
                                     </div>
@@ -416,8 +445,10 @@ export default function PitScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="30"
                                             value={formData.top_speed}
-                                            onChange={(e) => handleInputChange('top_speed', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('top_speed', Math.min(30, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('top_speed', formData.top_speed + increment)}>+</Button>
                                     </div>
@@ -471,8 +502,10 @@ export default function PitScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="500"
                                             value={formData.fuel_capacity}
-                                            onChange={(e) => handleInputChange('fuel_capacity', parseInt(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('fuel_capacity', Math.min(500, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_capacity', formData.fuel_capacity + increment)}>+</Button>
                                     </div>
@@ -484,8 +517,10 @@ export default function PitScoutingForm() {
                                         <Input
                                             type="number"
                                             className="text-center font-bold text-lg"
+                                            min="0"
+                                            max="50"
                                             value={formData.fuel_per_second}
-                                            onChange={(e) => handleInputChange('fuel_per_second', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) => handleInputChange('fuel_per_second', Math.min(50, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_per_second', formData.fuel_per_second + increment)}>+</Button>
                                     </div>
@@ -553,12 +588,22 @@ export default function PitScoutingForm() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="notes">Scouter Observations</Label>
+                                    <div className="flex justify-between items-center">
+                                        <Label htmlFor="notes">Scouter Observations</Label>
+                                        <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-wider",
+                                            formData.notes.length >= 180 ? "text-destructive" : "text-muted-foreground"
+                                        )}>
+                                            {formData.notes.length}/200
+                                        </span>
+                                    </div>
                                     <Textarea
                                         id="notes"
                                         placeholder="Any additional notes..."
                                         value={formData.notes}
                                         onChange={(e) => handleInputChange('notes', e.target.value)}
+                                        maxLength={200}
+                                        className="resize-none h-24"
                                     />
                                 </div>
                             </div>
