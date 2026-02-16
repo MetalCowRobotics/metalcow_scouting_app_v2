@@ -22,14 +22,15 @@ export default function LoginPage() {
     const redirectPath = searchParams.get('redirect') || '/'
     const supabase = createClient()
 
-    const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({
+    const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string, variant?: 'success' | 'confirm' | 'info' }>({
         open: false,
         title: '',
-        message: ''
+        message: '',
+        variant: 'info',
     })
 
-    const showAlert = (title: string, message: string) => {
-        setAlertConfig({ open: true, title, message })
+    const showAlert = (title: string, message: string, variant: 'success' | 'confirm' | 'info' = 'info') => {
+        setAlertConfig({ open: true, title, message, variant })
     }
 
     const handleAuth = async (e: React.FormEvent) => {
@@ -162,6 +163,7 @@ export default function LoginPage() {
                 onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
                 title={alertConfig.title}
                 message={alertConfig.message}
+                variant={alertConfig.variant}
             />
         </div>
     )

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -10,9 +11,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, AlertTriangle } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { getTBAData } from '@/lib/tba'
 import { AlertModal } from '@/components/ui/AlertModal'
+import { useSettings } from '@/contexts/SettingsContext'
 
 function TeamNickname({ teamNumber, onNameFetched }: { teamNumber: string, onNameFetched?: (name: string) => void }) {
     const [nickname, setNickname] = useState<string | null>(null)
@@ -114,105 +116,6 @@ function TeamNameSearch({ query, eventKey, onSelect }: { query: string, eventKey
     )
 }
 
-function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, onSelect: (key: string) => void }) {
-    const [query, setQuery] = useState('')
-    const [suggestions, setSuggestions] = useState<any[]>([])
-    const [loading, setLoading] = useState(false)
-    const [year, setYear] = useState(new Date().getFullYear().toString())
-
-    useEffect(() => {
-        if (query.length < 3) {
-            setSuggestions([])
-            return
-        }
-        const searchEvents = async () => {
-            setLoading(true)
-            try {
-                // Fetch all events for the year and filter locally (TBA search is limited)
-                const events = await getTBAData(`/events/${year}/simple`)
-                const matches = events
-                    .filter((e: any) =>
-                        (e.name?.toLowerCase() || '').includes(query.toLowerCase()) ||
-                        (e.city?.toLowerCase() || '').includes(query.toLowerCase()) ||
-                        (e.state_prov?.toLowerCase() || '').includes(query.toLowerCase()) ||
-                        (e.key?.toLowerCase() || '').includes(query.toLowerCase())
-                    )
-                    .slice(0, 10)
-                setSuggestions(matches)
-            } catch (e) {
-                setSuggestions([])
-            } finally {
-                setLoading(false)
-            }
-        }
-        const timer = setTimeout(searchEvents, 500)
-        return () => clearTimeout(timer)
-    }, [query, year])
-
-    return (
-        <div className="space-y-4">
-            <div className="flex gap-2">
-                <div className="w-24">
-                    <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Year</Label>
-                    <Input
-                        type="number"
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                        className="h-10"
-                    />
-                </div>
-                <div className="flex-1 relative">
-                    <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Search Event (e.g. "Chicago" or "Midwest")</Label>
-                    <Input
-                        placeholder="Search area or event name..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="h-10 pr-8"
-                    />
-                    {loading && <Loader2 className="absolute right-3 top-[34px] -translate-y-1/2 h-4 w-4 animate-spin opacity-40" />}
-
-                    {suggestions.length > 0 && (
-                        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                            {suggestions.map(e => (
-                                <button
-                                    key={e.key}
-                                    type="button"
-                                    onClick={() => {
-                                        onSelect(e.key)
-                                        setQuery('')
-                                        setSuggestions([])
-                                    }}
-                                    className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-0"
-                                >
-                                    <div className="font-bold text-sm">{e.name}</div>
-                                    <div className="text-[10px] text-muted-foreground flex justify-between">
-                                        <span>{e.city}, {e.state_prov}</span>
-                                        <span className="font-mono bg-muted px-1 rounded">{e.key}</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {query.length >= 3 && suggestions.length === 0 && !loading && (
-                        <div className="absolute z-20 w-full mt-1 bg-popover border rounded-xl shadow-lg p-4 text-center text-xs text-muted-foreground italic animate-in fade-in slide-in-from-top-2">
-                            No events found for "{query}" in {year}.
-                        </div>
-                    )}
-                </div>
-            </div>
-            {currentEventKey && (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20 animate-in zoom-in-95">
-                    <div>
-                        <div className="text-[10px] uppercase font-bold text-primary tracking-widest leading-none mb-1">Active Competition</div>
-                        <div className="text-sm font-bold truncate max-w-[200px]">Event Key: {currentEventKey}</div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
-
 // Define the steps
 const STEPS = {
     PREMATCH: 0,
@@ -225,6 +128,7 @@ const STEPS = {
 export default function MatchScoutingForm() {
     const searchParams = useSearchParams()
     const teamParam = searchParams.get('team')
+    const { settings } = useSettings()
 
     const [step, setStep] = useState(STEPS.PREMATCH)
     const [loading, setLoading] = useState(false)
@@ -239,39 +143,49 @@ export default function MatchScoutingForm() {
             const fullName = session?.user?.user_metadata?.full_name
             const email = session?.user?.email
 
-            if (firstName) {
-                setFormData(prev => ({ ...prev, scout_name: firstName }))
+            let nameToUse = ''
+            if (settings.auto_fill_scout_name && settings.scout_name) {
+                nameToUse = settings.scout_name
+            } else if (firstName) {
+                nameToUse = firstName
             } else if (fullName) {
-                setFormData(prev => ({ ...prev, scout_name: fullName }))
+                nameToUse = fullName
             } else if (email) {
-                setFormData(prev => ({
-                    ...prev,
-                    scout_name: email.split('@')[0] || email
-                }))
+                nameToUse = email.split('@')[0] || email
+            }
+
+            if (nameToUse) {
+                setFormData(prev => ({ ...prev, scout_name: nameToUse }))
             }
         }
         fetchUser()
-    }, [supabase])
+    }, [supabase, settings])
+
+    // Sync event key from settings
+    useEffect(() => {
+        setFormData(prev => ({ ...prev, event_key: settings.event_key }))
+    }, [settings.event_key])
 
     // Alert Modal State
-    const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({
+    const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string, variant?: 'success' | 'confirm' | 'info' }>({
         open: false,
         title: '',
-        message: ''
+        message: '',
+        variant: 'info',
     })
 
-    const showAlert = (title: string, message: string) => {
-        setAlertConfig({ open: true, title, message })
+    const showAlert = (title: string, message: string, variant: 'success' | 'confirm' | 'info' = 'info') => {
+        setAlertConfig({ open: true, title, message, variant })
     }
 
     const [formData, setFormData] = useState({
         // Meta
         match_number: '',
-        team_number: teamParam || '',
+        team_number: teamParam || (settings.default_team_number ? settings.default_team_number.toString() : ''),
         team_name: '',
-        event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
+        event_key: settings.event_key,
         alliance: '',
-        scout_name: '',
+        scout_name: settings.auto_fill_scout_name ? settings.scout_name : '',
         is_practice_match: false,
         robot_on_field: true,
 
@@ -304,7 +218,6 @@ export default function MatchScoutingForm() {
             try {
                 const teams = await getTBAData(`/event/${formData.event_key}/teams/simple`)
                 setValidTeams(teams.map((t: any) => t.team_number).sort((a: number, b: number) => a - b))
-                // Clear team number if it's not in the new list (optional, but safer)
                 setFormData(prev => ({ ...prev, team_number: '' }))
             } catch (e) {
                 console.error('Failed to fetch teams for event:', e)
@@ -336,16 +249,16 @@ export default function MatchScoutingForm() {
                 console.error('Error submitting match data:', error)
                 showAlert('Submission Error', 'Error submitting data: ' + error.message)
             } else {
-                showAlert('Success!', 'Match data submitted successfully!')
+                showAlert('Success!', 'Match data submitted successfully!', 'success')
                 // Reset form or redirect
                 setStep(STEPS.PREMATCH)
                 setFormData({
                     match_number: '',
-                    team_number: '',
+                    team_number: settings.default_team_number ? settings.default_team_number.toString() : '',
                     team_name: '',
-                    event_key: process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe',
+                    event_key: settings.event_key,
                     alliance: '',
-                    scout_name: '',
+                    scout_name: settings.auto_fill_scout_name ? settings.scout_name : '',
                     is_practice_match: false,
                     robot_on_field: true,
                     auto_preloaded: false,
@@ -481,10 +394,15 @@ export default function MatchScoutingForm() {
 
                             <div className="space-y-4 bg-muted/20 p-4 rounded-2xl border border-dashed">
                                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Competition Setup</h4>
-                                <EventSearch
-                                    currentEventKey={formData.event_key}
-                                    onSelect={(key) => handleInputChange('event_key', key)}
-                                />
+                                <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20">
+                                    <div>
+                                        <div className="text-[10px] uppercase font-bold text-primary tracking-widest leading-none mb-1">Active Competition</div>
+                                        <div className="text-sm font-bold">Event Key: {settings.event_key}</div>
+                                    </div>
+                                    <Link href="/settings" className="text-xs text-primary hover:underline font-bold">
+                                        Change
+                                    </Link>
+                                </div>
                             </div>
 
                             <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0 pt-2">
@@ -939,6 +857,7 @@ export default function MatchScoutingForm() {
                 onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
                 title={alertConfig.title}
                 message={alertConfig.message}
+                variant={alertConfig.variant}
             />
         </div>
     )

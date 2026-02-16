@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Figtree } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
 const figtree = Figtree({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -40,8 +41,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar />
-          <main>{children}</main>
+          <SettingsProvider>
+            <Navbar />
+            <main>{children}</main>
+          </SettingsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
-import { Bot, BarChart2, ScrollText, Users, Globe, Shield } from 'lucide-react'
+import { Bot, BarChart2, ScrollText, Users, Globe, Shield, Settings } from 'lucide-react'
 
 import { isAdmin } from '@/lib/admin'
 
@@ -41,6 +41,7 @@ export function Navbar() {
         { href: '/scout/pit', label: 'Pit Scout', icon: Bot },
         { href: '/analytics', label: 'Analytics', icon: BarChart2 },
         { href: '/tba', label: 'TBA Data', icon: Globe },
+        { href: '/settings', label: 'Settings', icon: Settings },
     ]
 
     const routes = isAdmin(user?.email)

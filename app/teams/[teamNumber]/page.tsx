@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Label } from '@/components/ui/label'
+import { useSettings } from '@/contexts/SettingsContext'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import {
     ArrowLeft,
     Bot,
@@ -173,20 +175,25 @@ interface TeamProfileData {
     tbaAwards?: any[]
 }
 
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
-
 export default function TeamProfilePage() {
     const params = useParams()
     const router = useRouter()
+    const { settings } = useSettings()
     const teamNumber = params.teamNumber as string
     const [data, setData] = useState<TeamProfileData | null>(null)
     const [loading, setLoading] = useState(true)
-    const [eventKey, setEventKey] = useState(process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe') // Default event from env
+    const [eventKey, setEventKey] = useState(settings.event_key)
     const [tempEventKey, setTempEventKey] = useState(eventKey)
     const [viewAll, setViewAll] = useState(false)
     const [selectedMatch, setSelectedMatch] = useState<any>(null)
 
     const supabase = createClient()
+
+    // Sync event key from settings
+    useEffect(() => {
+        setEventKey(settings.event_key)
+        setTempEventKey(settings.event_key)
+    }, [settings.event_key])
 
     useEffect(() => {
         async function fetchTeamData() {

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import TeamComparisonGraphs from './scouting/TeamComparisonGraphs'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface HybridTeamStat {
     team_number: number
@@ -41,14 +42,20 @@ interface HybridTeamStat {
 }
 
 export default function AnalyticsDashboard() {
+    const { settings } = useSettings()
     const [stats, setStats] = useState<HybridTeamStat[]>([])
     const [loading, setLoading] = useState(true)
-    const [eventKey, setEventKey] = useState(process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe')
+    const [eventKey, setEventKey] = useState(settings.event_key)
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<'score' | 'fps' | 'defense'>('score')
     const [activeTab, setActiveTab] = useState<'strategy' | 'profiles' | 'graphs'>('strategy')
 
     const supabase = createClient()
+
+    // Sync event key from settings
+    useEffect(() => {
+        setEventKey(settings.event_key)
+    }, [settings.event_key])
 
     useEffect(() => {
         async function fetchAllData() {

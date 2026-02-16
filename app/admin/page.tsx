@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Shield, Users, Database, Settings, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { AlertModal } from '@/components/ui/AlertModal'
+import { useSettings } from '@/contexts/SettingsContext'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,8 +22,9 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function AdminPage() {
+    const { settings } = useSettings()
     const [activeSection, setActiveSection] = useState<'overview' | 'data' | 'users'>('overview')
-    const [eventKey, setEventKey] = useState(process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || '2026ilpe')
+    const [eventKey, setEventKey] = useState(settings.event_key)
     const [scouters, setScouters] = useState<{ name: string, isRegistered: boolean, email?: string }[]>([])
     const [loading, setLoading] = useState(false)
     const [stats, setStats] = useState({ matchCount: 0, pitCount: 0 })
@@ -31,14 +33,19 @@ export default function AdminPage() {
     const [pits, setPits] = useState<any[]>([])
     const supabase = createClient()
 
-    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', message: '' })
+    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', message: '', variant: 'info' as 'success' | 'confirm' | 'info' })
     const [deleteModal, setDeleteModal] = useState<{ open: boolean, scouterName: string, scouterEmail?: string }>({ open: false, scouterName: '' })
-    const showAlert = (title: string, message: string) => setAlertConfig({ open: true, title, message })
+    const showAlert = (title: string, message: string, variant: 'success' | 'confirm' | 'info' = 'info') => setAlertConfig({ open: true, title, message, variant })
 
     useEffect(() => {
         fetchStats()
         fetchScouters()
     }, [])
+
+    // Sync event key from settings
+    useEffect(() => {
+        setEventKey(settings.event_key)
+    }, [settings.event_key])
 
     const fetchStats = async () => {
         const { count: mCount } = await supabase.from('match_scouting').select('*', { count: 'exact', head: true })
@@ -504,6 +511,7 @@ export default function AdminPage() {
                     onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
                     title={alertConfig.title}
                     message={alertConfig.message}
+                    variant={alertConfig.variant}
                 />
             </div>
         </AdminRoute >
