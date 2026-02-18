@@ -74,11 +74,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     if (error) {
                         if (error.code === 'PGRST116') {
                             // No settings found, create default settings
+                            const firstName = session.user.user_metadata?.first_name
+                            const fullName = session.user.user_metadata?.full_name
+                            const defaultScoutName = firstName || fullName || ''
+
                             const { data: newSettings, error: insertError } = await supabase
                                 .from('user_settings')
                                 .insert({
                                     user_id: session.user.id,
                                     ...defaultSettings,
+                                    scout_name: defaultScoutName,
                                 })
                                 .select()
                                 .single()
@@ -87,7 +92,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                                 setSettings({
                                     event_key: newSettings.event_key || defaultSettings.event_key,
                                     default_team_number: newSettings.default_team_number,
-                                    scout_name: newSettings.scout_name || '',
+                                    scout_name: newSettings.scout_name || defaultScoutName,
                                     auto_fill_scout_name: newSettings.auto_fill_scout_name ?? defaultSettings.auto_fill_scout_name,
                                     auto_sync: newSettings.auto_sync ?? defaultSettings.auto_sync,
                                     offline_mode: newSettings.offline_mode ?? defaultSettings.offline_mode,
@@ -164,13 +169,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     const resetSettings = async () => {
-        setSettings(defaultSettings)
+        const firstName = user?.user_metadata?.first_name
+        const fullName = user?.user_metadata?.full_name
+        const defaultScoutName = firstName || fullName || ''
+        
+        const resetWithName = { ...defaultSettings, scout_name: defaultScoutName }
+        setSettings(resetWithName)
 
         if (user) {
             try {
                 await supabase
                     .from('user_settings')
-                    .update(defaultSettings)
+                    .update(resetWithName)
                     .eq('user_id', user.id)
             } catch (err) {
                 console.error('Error resetting settings:', err)

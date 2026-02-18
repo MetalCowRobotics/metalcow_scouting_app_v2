@@ -8,16 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Label } from '@/components/ui/label'
 import { useSettings } from '@/contexts/SettingsContext'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import {
     ArrowLeft,
     Bot,
     Trophy,
     Zap,
-    Shield,
     Activity,
     Target,
     BarChart3,
@@ -26,16 +23,10 @@ import {
     Loader2,
     Calendar,
     MapPin,
-    AlertCircle,
     CheckCircle2,
     Weight,
     Gauge,
-    ArrowUpCircle,
-    Info,
-    User,
-    Timer,
     Flame,
-    Navigation,
     X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -49,6 +40,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function MatchDetailModal({ isOpen, onClose, match }: { isOpen: boolean, onClose: () => void, match: any }) {
     if (!match) return null
 
@@ -148,6 +140,7 @@ function MatchDetailModal({ isOpen, onClose, match }: { isOpen: boolean, onClose
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Scout Observations</Label>
                             <div className="p-4 rounded-2xl bg-muted/30 border-2 italic text-sm leading-relaxed">
+                                {/* eslint-disable-next-line react/no-unescaped-entities */}
                                 "{match.comments || 'No specific observations recorded for this match.'}"
                             </div>
                         </div>
@@ -167,11 +160,16 @@ function MatchDetailModal({ isOpen, onClose, match }: { isOpen: boolean, onClose
     )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface TeamProfileData {
     pit?: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     matches: any[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tbaInfo?: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tbaEvents?: any[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tbaAwards?: any[]
 }
 

@@ -21,7 +21,9 @@ export default function AdminRoute({ children }: { children: React.ReactNode }) 
                 return
             }
 
-            if (!isAdmin(session.user.email)) {
+            const adminStatus = await isAdmin(session.user.id)
+
+            if (!adminStatus) {
                 router.push('/') // Redirect non-admins to home
                 return
             }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react"
 import { AlertModal } from "@/components/ui/AlertModal"
 
-export default function LoginPage() {
+function LoginForm() {
     const [email, setEmail] = useState("")
     const [firstName, setFirstName] = useState("")
     const [lastName, setLastName] = useState("")
@@ -67,8 +67,9 @@ export default function LoginPage() {
                 router.push(redirectPath)
                 router.refresh()
             }
-        } catch (error: any) {
-            showAlert("Authentication Error", error.message)
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
+            showAlert("Authentication Error", message)
         } finally {
             setLoading(false)
         }
@@ -78,7 +79,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
             <Card className="w-full max-w-sm border-2">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-black">{isSignUp ? "Join the Network" : "Strategic Login"}</CardTitle>
+                    <CardTitle className="text-2xl font-black">{isSignUp ? "Join the Network" : "Login"}</CardTitle>
                     <CardDescription className="font-medium">
                         {isSignUp
                             ? "Register your identity to start contributing data."
@@ -166,5 +167,28 @@ export default function LoginPage() {
                 variant={alertConfig.variant}
             />
         </div>
+    )
+}
+
+function LoginFormLoading() {
+    return (
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
+            <Card className="w-full max-w-sm border-2">
+                <CardHeader>
+                    <CardTitle className="text-2xl font-black">Loading...</CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<LoginFormLoading />}>
+            <LoginForm />
+        </Suspense>
     )
 }

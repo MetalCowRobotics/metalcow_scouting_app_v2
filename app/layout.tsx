@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
 
 const figtree = Figtree({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -42,8 +43,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SettingsProvider>
-            <Navbar />
-            <main>{children}</main>
+            <PermissionsProvider>
+              <Navbar />
+              <main>{children}</main>
+            </PermissionsProvider>
           </SettingsProvider>
         </ThemeProvider>
       </body>

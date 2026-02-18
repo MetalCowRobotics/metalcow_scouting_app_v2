@@ -38,7 +38,15 @@ Advanced robotics scouting and analytics platform for FRC (FIRST Robotics Compet
 - Team event history
 - Live score updates
 
+### User Settings
+- Configurable event selection per user
+- Personal scout name
+- Auto-sync and offline mode support
+- Display preferences (compact view, TBA data)
+- Notification settings
+
 ### Admin Panel
+- User role management (admin/scout/viewer)
 - Export data to CSV/JSON
 - Event configuration
 - Scout management
@@ -94,32 +102,26 @@ NEXT_PUBLIC_TBA_API_KEY=your_tba_api_key
 
 # Event Configuration
 NEXT_PUBLIC_DEFAULT_EVENT_KEY=2026ilpe
-
-# Admin Configuration (comma-separated emails)
-NEXT_PUBLIC_ADMIN_EMAILS=your.email@example.com
-
-# Reserved emails for scout accounts
-RESERVED_EMAILS=email1@example.com, email2@example.com
 ```
 
 ### 4. Set up the database
 
-The project includes a `master_schema.sql` file with the complete database schema. Run this in your Supabase SQL Editor:
+The project includes a `supabase/master_schema.sql` file with the complete database schema. Run this in your Supabase SQL Editor:
 
 1. Go to your Supabase project dashboard
 2. Navigate to SQL Editor
-3. Copy and paste the contents of `master_schema.sql`
+3. Copy and paste the contents of `supabase/master_schema.sql`
 4. Run the SQL to create all tables, views, and functions
 
-**Important**: If you encounter schema cache errors (e.g., "Could not find column X in schema cache"), you may need to add missing columns manually:
+After the main schema, apply any pending migrations from `supabase/migrations/`:
 
-```sql
--- Example: Adding missing column
-ALTER TABLE public.match_scouting 
-ADD COLUMN IF NOT EXISTS robot_on_field BOOLEAN DEFAULT TRUE;
-```
+- `add_profiles_role_columns.sql` - Adds role column to profiles
+- `add_profiles_admin_policies.sql` - RLS policies for profiles
+- `create_user_settings.sql` - User settings table
+- `add_pit_scouting_unique_constraint.sql` - Unique constraint for pit scouting
+- `add_scouting_unique_constraints.sql` - Unique constraints for match scouting
 
-After modifying the schema, refresh the Supabase dashboard or trigger a schema cache refresh.
+**Important**: If you encounter schema cache errors (e.g., "Could not find column X in schema cache"), you may need to add missing columns manually. After modifying the schema, refresh the Supabase dashboard or trigger a schema cache refresh.
 
 ### 5. Run the development server
 
@@ -129,29 +131,61 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 6. Create your admin account
+
+1. Sign up for an account at `/login`
+2. In Supabase SQL Editor, assign yourself the admin role:
+
+```sql
+-- Find your user ID from auth.users table
+SELECT id, email FROM auth.users;
+
+-- Update your profile to admin role
+UPDATE public.profiles 
+SET role = 'admin' 
+WHERE email = 'your_email@example.com';
+```
+
+User roles:
+- **admin** - Full access to all features including user management
+- **scout** - Can create/edit scouting data and view analytics
+- **viewer** - Read-only access (default for new users)
+
 ## Project Structure
 
 ```
 app/
 ├── page.tsx              # Landing page
 ├── login/                # Authentication
-├── admin/                # Admin panel
+├── settings/             # User settings
+├── admin/                # Admin panel (admin only)
 ├── analytics/            # Analytics dashboard
 ├── teams/                # Team database
 │   └── [teamNumber]/    # Individual team profile
 ├── scout/
 │   ├── match/            # Match scouting form
 │   └── pit/              # Pit scouting form
-└── tba/                  # The Blue Alliance integration
+├── tba/                  # The Blue Alliance integration
+└── api/                  # API routes
 
 components/
 ├── ui/                   # shadcn/ui components
 ├── auth/                 # Authentication components
-└── AnalyticsDashboard/    # Analytics components
+├── AnalyticsDashboard/   # Analytics components
+└── scouting/             # Scouting form components
 
 lib/
 ├── supabase.ts           # Supabase client
-└── tba.ts                # TBA API utilities
+├── tba.ts                # TBA API utilities
+└── admin.ts              # Admin/permissions utilities
+
+contexts/
+├── PermissionsContext.tsx  # User permissions & roles
+└── SettingsContext.tsx    # User settings
+
+supabase/
+├── master_schema.sql     # Complete database schema
+└── migrations/           # Database migrations
 ```
 
 ## Available Scripts
@@ -165,9 +199,10 @@ lib/
 
 The main tables are:
 
+- **`profiles`** - User accounts with roles (admin/scout/viewer)
+- **`user_settings`** - Per-user settings (event, scout name, preferences)
 - **`match_scouting`** - Match performance data
-- **`pit_scouting`** - Robot specifications
-- **`users`** - Scout user accounts
+- **`pit_scouting`** - Robot specifications (one per team per event)
 
 Views:
 - **`hybrid_team_stats`** - Combined pit + match analytics

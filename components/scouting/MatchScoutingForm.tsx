@@ -763,7 +763,7 @@ export default function MatchScoutingForm() {
                                     />
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Poor</span>
-                                        <span>Average</span>
+                                        <span className="font-bold text-primary">{formData.defense_rating}%</span>
                                         <span>Excellent</span>
                                     </div>
                                 </div>
@@ -780,7 +780,7 @@ export default function MatchScoutingForm() {
                                     />
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Poor</span>
-                                        <span>Average</span>
+                                        <span className="font-bold text-primary">{formData.accuracy_rating}%</span>
                                         <span>Excellent</span>
                                     </div>
                                 </div>

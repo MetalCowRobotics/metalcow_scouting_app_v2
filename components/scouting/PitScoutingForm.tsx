@@ -147,14 +147,39 @@ export default function PitScoutingForm() {
 
     const supabase = createClient()
 
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const firstName = session?.user?.user_metadata?.first_name
+            const fullName = session?.user?.user_metadata?.full_name
+            const email = session?.user?.email
+
+            let nameToUse = ''
+            if (settings.auto_fill_scout_name && settings.scout_name) {
+                nameToUse = settings.scout_name
+            } else if (firstName) {
+                nameToUse = firstName
+            } else if (fullName) {
+                nameToUse = fullName
+            } else if (email) {
+                nameToUse = email.split('@')[0] || email
+            }
+
+            if (nameToUse) {
+                setFormData(prev => ({ ...prev, scout_name: nameToUse }))
+            }
+        }
+        fetchUser()
+    }, [supabase, settings])
+
     const [formData, setFormData] = useState({
         team_number: teamParam || (settings.default_team_number ? settings.default_team_number.toString() : ''),
         team_name: '',
         event_key: settings.event_key,
-        weight: 0,
-        fuel_capacity: 0,
-        top_speed: 0,
-        fuel_per_second: 0,
+        weight: 80,
+        fuel_capacity: 20,
+        top_speed: 12,
+        fuel_per_second: 10,
         primary_role: 'Offense',
         climb_level: '1',
         climbs_in_auto: false,
@@ -212,11 +237,11 @@ export default function PitScoutingForm() {
         }
         if (step === STEPS.SCORING) {
             if (formData.fuel_capacity < 0 || formData.fuel_capacity > 500) {
-                showAlert('Implausible Capacity', 'Fuel capacity must be between 0 and 500.');
+                showAlert('Implausible Capacity', 'Fuel capacity must be between 0 and 500');
                 return false;
             }
             if (formData.fuel_per_second < 0 || formData.fuel_per_second > 50) {
-                showAlert('Implausible Rate', 'Fuel per second must be between 0 and 50.');
+                showAlert('Implausible Rate', 'Fuel per second must be between 0 and Max Capacity');
                 return false;
             }
         }
@@ -233,7 +258,10 @@ export default function PitScoutingForm() {
     const handleSubmit = async () => {
         setLoading(true)
         try {
-            const { error } = await supabase.from('pit_scouting').upsert([
+            // First try to delete existing entry, then insert new one
+            await supabase.from('pit_scouting').delete().eq('team_number', parseInt(formData.team_number)).eq('event_key', formData.event_key)
+            
+            const { error } = await supabase.from('pit_scouting').insert([
                 {
                     team_number: parseInt(formData.team_number),
                     team_name: formData.team_name,
@@ -253,7 +281,7 @@ export default function PitScoutingForm() {
                     scout_name: formData.scout_name,
                     comments: formData.notes,
                 },
-            ], { onConflict: 'team_number, event_key' })
+            ])
 
             if (error) {
                 showAlert('Submission Error', error.message)
@@ -508,9 +536,9 @@ export default function PitScoutingForm() {
                                             type="number"
                                             className="text-center font-bold text-lg"
                                             min="0"
-                                            max="50"
+                                            max={formData.fuel_capacity}
                                             value={formData.fuel_per_second}
-                                            onChange={(e) => handleInputChange('fuel_per_second', Math.min(50, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                            onChange={(e) => handleInputChange('fuel_per_second', Math.min(formData.fuel_capacity, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
                                         <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_per_second', formData.fuel_per_second + increment)}>+</Button>
                                     </div>

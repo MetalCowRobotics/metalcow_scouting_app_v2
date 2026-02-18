@@ -10,12 +10,12 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Settings as SettingsIcon, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, User, Globe, Bell, Eye, Database, Wifi, WifiOff } from 'lucide-react'
 import { getTBAData } from '@/lib/tba'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { AlertModal } from '@/components/ui/AlertModal'
 
 function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, onSelect: (key: string) => void }) {
     const [query, setQuery] = useState('')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [suggestions, setSuggestions] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [year, setYear] = useState(new Date().getFullYear().toString())
@@ -30,6 +30,7 @@ function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, o
             try {
                 const events = await getTBAData(`/events/${year}/simple`)
                 const matches = events
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     .filter((e: any) =>
                         (e.name?.toLowerCase() || '').includes(query.toLowerCase()) ||
                         (e.city?.toLowerCase() || '').includes(query.toLowerCase()) ||
@@ -38,7 +39,7 @@ function EventSearch({ currentEventKey, onSelect }: { currentEventKey: string, o
                     )
                     .slice(0, 10)
                 setSuggestions(matches)
-            } catch (e) {
+            } catch {
                 setSuggestions([])
             } finally {
                 setLoading(false)
@@ -127,7 +128,7 @@ export default function SettingsPage() {
             await updateSettings(localSettings)
             setSaveStatus('success')
             setTimeout(() => setSaveStatus('idle'), 3000)
-        } catch (err) {
+        } catch {
             setSaveStatus('error')
         } finally {
             setSaving(false)
@@ -158,13 +159,38 @@ export default function SettingsPage() {
 
     return (
         <div className="container py-8 max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-2xl">
-                    <SettingsIcon className="h-8 w-8 text-primary" />
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-2xl">
+                        <SettingsIcon className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+                        <p className="text-muted-foreground">Configure your scouting preferences</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight">Settings</h1>
-                    <p className="text-muted-foreground">Configure your scouting preferences</p>
+                <div className="flex gap-2">
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={handleReset} 
+                        className="h-10 w-10"
+                        title="Reset Settings"
+                    >
+                        <RotateCcw className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        onClick={handleSave} 
+                        disabled={saving} 
+                        className="h-10 w-10 p-0"
+                        title="Save Settings"
+                    >
+                        {saving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Save className="h-4 w-4" />
+                        )}
+                    </Button>
                 </div>
             </div>
 
@@ -374,21 +400,6 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
-
-            <div className="flex gap-4 pt-4">
-                <Button onClick={handleSave} disabled={saving} className="flex-1 h-12 text-lg font-bold">
-                    {saving ? (
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    ) : (
-                        <Save className="h-5 w-5 mr-2" />
-                    )}
-                    Save Settings
-                </Button>
-                <Button variant="outline" onClick={handleReset} className="h-12 font-bold">
-                    <RotateCcw className="h-5 w-5 mr-2" />
-                    Reset
-                </Button>
             </div>
 
             <AlertModal
