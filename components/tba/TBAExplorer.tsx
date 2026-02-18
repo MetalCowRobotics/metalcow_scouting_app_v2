@@ -85,7 +85,7 @@ export default function TBAExplorer() {
             )}
 
             {event && (
-                <Card className="border-none shadow-md overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                <Card className="border-none shadow-md overflow-hidden bg-linear-to-br from-card to-muted/20">
                     <CardHeader className="bg-primary/5 pb-6">
                         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                             <div>
