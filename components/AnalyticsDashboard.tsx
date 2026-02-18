@@ -106,7 +106,7 @@ export default function AnalyticsDashboard() {
     const [eventKey, setEventKey] = useState(settings.event_key)
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'rankings' | 'graphs' | 'compare' | 'tba'>('rankings')
-    const [robotStatFilter, setRobotStatFilter] = useState<string>('weight')
+    const [robotStatFilter, setRobotStatFilter] = useState<string[]>(['weight'])
     const [climbFilter, setClimbFilter] = useState<string>('all')
     
     // TBA Data
@@ -500,59 +500,64 @@ export default function AnalyticsDashboard() {
                         </Card>
                     </div>
 
-                    {/* Robot Stats Dropdown */}
+                    {/* Robot Stats - Horizontal Tab Layout */}
                     <Card className="border-2 shadow-xl">
-                        <CardHeader className="border-b pb-4">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    <Radar className="h-5 w-5 text-primary" /> Robot Stats
-                                </CardTitle>
-                                <Select value={robotStatFilter} onValueChange={(value) => value && setRobotStatFilter(value)}>
-                                    <SelectTrigger className="w-48">
-                                        <SelectValue placeholder="Select stat" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {ROBOT_STAT_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                                <div className="flex items-center gap-2">
-                                                    <opt.icon className="h-4 w-4" />
-                                                    {opt.label}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 mb-4">
+                                <Radar className="h-5 w-5 text-primary" /> Robot Stats
+                            </CardTitle>
+                            <div className="flex flex-wrap gap-2">
+                                {ROBOT_STAT_OPTIONS.map(opt => (
+                                    <Button
+                                        key={opt.value}
+                                        variant={robotStatFilter.includes(opt.value) ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => {
+                                            if (robotStatFilter.includes(opt.value)) {
+                                                setRobotStatFilter(robotStatFilter.filter(f => f !== opt.value))
+                                            } else {
+                                                setRobotStatFilter([...robotStatFilter, opt.value])
+                                            }
+                                        }}
+                                        className={cn(
+                                            "gap-2 font-semibold",
+                                            robotStatFilter.includes(opt.value)
+                                                ? "bg-primary text-primary-foreground shadow-md"
+                                                : "border-2 hover:border-primary/50"
+                                        )}
+                                    >
+                                        <opt.icon className="h-4 w-4" />
+                                        {opt.label}
+                                    </Button>
+                                ))}
                             </div>
                             <CardDescription>View teams by selected robot statistic</CardDescription>
                         </CardHeader>
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Team</TableHead>
-                                    <TableHead>Nickname</TableHead>
-                                    <TableHead className="text-right">{ROBOT_STAT_OPTIONS.find(o => o.value === robotStatFilter)?.label}</TableHead>
-                                    <TableHead className="text-right">Avg Score</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        <CardContent className="pt-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {filteredStats.map(team => (
-                                    <TableRow key={team.team_number} className="hover:bg-muted/30">
-                                        <TableCell>
-                                            <Link href={`/teams/${team.team_number}`} className="font-black hover:text-primary">
-                                                #{team.team_number}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">{team.nickname || 'N/A'}</TableCell>
-                                        <TableCell className="text-right font-bold">
-                                            {getStatValue(team, robotStatFilter)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-black text-primary">
-                                            {Math.round(team.avg_score || 0)}
-                                        </TableCell>
-                                    </TableRow>
+                                    <Link key={team.team_number} href={`/teams/${team.team_number}`}>
+                                        <Card className="hover:bg-muted/50 transition-all duration-200 hover:shadow-lg border-2 hover:border-primary/30">
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="font-black text-xl hover:text-primary">#{team.team_number}</span>
+                                                    <span className="font-black text-primary text-lg">{Math.round(team.avg_score || 0)}</span>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground truncate mb-2">{team.nickname || 'N/A'}</p>
+                                                <div className="space-y-1">
+                                                    {robotStatFilter.map(filter => (
+                                                        <div key={filter} className="flex items-center justify-between text-xs">
+                                                            <span className="text-muted-foreground uppercase tracking-wide">{ROBOT_STAT_OPTIONS.find(o => o.value === filter)?.label}</span>
+                                                            <span className="font-bold text-primary">{getStatValue(team, filter)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </Link>
                                 ))}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        </CardContent>
                     </Card>
                 </div>
             )}

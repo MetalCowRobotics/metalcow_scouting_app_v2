@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   title: "Metal Cow Scouting App",
   description: "Scouting and analytics for the Metal Cow",
   icons: {
-    icon: '/favicon.png',
+    icon: '.././public/favicon.png',
   }
 };
 
