@@ -101,13 +101,13 @@ export default function Home() {
                         {[
                             {
                                 href: '/scout/match',
-                                icon: ClipboardList,
+                                icon: Trophy,
                                 title: 'Match Scouting',
                                 desc: 'Log match data with real-time validation and QR quick-entry',
                             },
                             {
                                 href: '/scout/pit',
-                                icon: Cpu,
+                                icon: ClipboardList,
                                 title: 'Pit Scouting',
                                 desc: 'Capture robot specs, capabilities, and team contacts',
                             },

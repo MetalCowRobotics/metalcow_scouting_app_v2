@@ -121,6 +121,20 @@ export default function SettingsPage() {
         }
     }, [settings, settingsLoading])
 
+    const hasUnsaved = JSON.stringify(localSettings) !== JSON.stringify(settings)
+
+    // Warn on page unload if there are unsaved changes
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (!hasUnsaved) return
+            e.preventDefault()
+            e.returnValue = 'You have unsaved settings. Are you sure you want to leave?'
+            return 'You have unsaved settings. Are you sure you want to leave?'
+        }
+        window.addEventListener('beforeunload', handler)
+        return () => window.removeEventListener('beforeunload', handler)
+    }, [hasUnsaved])
+
     const handleSave = async () => {
         setSaving(true)
         setSaveStatus('idle')
@@ -193,6 +207,19 @@ export default function SettingsPage() {
                     </Button>
                 </div>
             </div>
+
+            {hasUnsaved && (
+                <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-yellow-500/10 border border-amber-500/20 text-amber-600">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">You have unsaved changes.</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setLocalSettings(settings)}>Discard</Button>
+                        <Button onClick={handleSave} disabled={saving}>Save</Button>
+                    </div>
+                </div>
+            )}
 
             {saveStatus === 'success' && (
                 <div className="flex items-center gap-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 animate-in fade-in slide-in-from-top-2">

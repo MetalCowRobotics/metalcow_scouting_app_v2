@@ -312,7 +312,7 @@ export default function AdminPage() {
                         </h1>
                         <p className="text-muted-foreground font-medium">Strategic control and system management for Metal Cow Robotics.</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                         <Button variant={activeSection === 'overview' ? 'default' : 'outline'} onClick={() => setActiveSection('overview')}>Overview</Button>
                         <Button variant={activeSection === 'data' ? 'default' : 'outline'} onClick={() => setActiveSection('data')}>Data Management</Button>
                         <Button variant={activeSection === 'users' ? 'default' : 'outline'} onClick={() => setActiveSection('users')}>Users</Button>

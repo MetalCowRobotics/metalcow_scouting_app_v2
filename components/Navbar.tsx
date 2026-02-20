@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Logo } from '@/components/Logo'
-import { BarChart2, ScrollText, Users, Shield, Settings, User, LogOut, ChevronDown } from 'lucide-react'
+import { BarChart2, ScrollText, Shield, Settings, User, LogOut, ChevronDown, Trophy, Wrench, Sun, Moon, ClipboardList } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 import { isAdmin } from '@/lib/admin'
 
@@ -18,6 +19,7 @@ export function Navbar() {
     const [isAdminUser, setIsAdminUser] = useState(false)
     const [showUserMenu, setShowUserMenu] = useState(false)
     const supabase = createClient()
+    const { theme, setTheme } = useTheme()
 
     useEffect(() => {
         const getUser = async () => {
@@ -49,9 +51,9 @@ export function Navbar() {
     }
 
     const baseRoutes = [
-        { href: '/', label: 'Home', icon: Users },
-        { href: '/scout/match', label: 'Match Scout', icon: ScrollText },
-        { href: '/scout/pit', label: 'Pit Scout', icon: ScrollText },
+        { href: '/', label: 'Home' },
+        { href: '/scout/match', label: 'Match Scout', icon: Trophy },
+        { href: '/scout/pit', label: 'Pit Scout', icon: ClipboardList },
         { href: '/analytics', label: 'Analytics', icon: BarChart2 },
     ]
 
@@ -62,7 +64,7 @@ export function Navbar() {
                     <Link href="/" className="mr-6 flex items-center space-x-2">
                         <Logo width={140} height={40} />
                     </Link>
-                    <nav className="flex items-center space-x-6 text-sm font-medium">
+                    <nav className="flex items-center space-x-8 text-sm font-medium">
                         {baseRoutes.map((route) => (
                             <Link
                                 key={route.href}
@@ -83,17 +85,17 @@ export function Navbar() {
                     <Link href="/">
                         <Logo width={100} height={28} />
                     </Link>
-                    <div className="flex gap-4">
+                    <div className="flex w-48 justify-between">
                         {baseRoutes.map((route) => (
-                            <Link key={route.href} href={route.href}>
-                                <route.icon className={cn("h-5 w-5", pathname === route.href ? "text-primary" : "text-muted-foreground")} />
+                            <Link key={route.href} href={route.href} className="flex-1 text-center">
+                                {route.icon ? <route.icon className={cn("h-5 w-5 mx-auto", pathname === route.href ? "text-primary" : "text-muted-foreground")} /> : null}
                             </Link>
                         ))}
                     </div>
                 </div>
 
-                <div className="flex flex-1 items-center justify-end space-x-2">
-                    <ModeToggle />
+                <div className="flex flex-1 items-center justify-end space-x-2 ml-4">
+                    {!user && <ModeToggle />}
                     {user ? (
                         <div className="relative">
                             <button
@@ -113,6 +115,12 @@ export function Navbar() {
                                         <Settings className="h-4 w-4" />
                                         Settings
                                     </Link>
+                                    <div className="px-3 py-2 border-t">
+                                        <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center gap-2 text-sm hover:bg-muted w-full text-left">
+                                            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                                            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                                        </button>
+                                    </div>
                                     {isAdminUser && (
                                         <Link href="/admin" className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted border-t" onClick={() => setShowUserMenu(false)}>
                                             <Shield className="h-4 w-4" />

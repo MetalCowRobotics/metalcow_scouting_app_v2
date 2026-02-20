@@ -367,7 +367,7 @@ export default function AnalyticsDashboard() {
                 </div>
 
                 <div className="flex flex-wrap gap-4 w-full md:w-auto">
-                    <div className="flex bg-muted p-1 rounded-xl border-2">
+                    <div className="flex flex-col sm:flex-row bg-muted p-1 rounded-xl border-2">
                         <button
                             onClick={() => setActiveTab('rankings')}
                             className={cn(
@@ -671,7 +671,8 @@ export default function AnalyticsDashboard() {
                             </div>
                             <CardDescription>Compare teams across all statistics</CardDescription>
                         </CardHeader>
-                        <Table>
+                        <CardContent className="overflow-x-auto">
+                            <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
                                     <TableHead>Team</TableHead>
@@ -737,6 +738,7 @@ export default function AnalyticsDashboard() {
                                     ))}
                             </TableBody>
                         </Table>
+                        </CardContent>
                     </Card>
                 </div>
             )}

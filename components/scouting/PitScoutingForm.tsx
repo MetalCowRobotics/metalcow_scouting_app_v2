@@ -241,7 +241,7 @@ export default function PitScoutingForm() {
                 return false;
             }
             if (formData.fuel_per_second < 0 || formData.fuel_per_second > 50) {
-                showAlert('Implausible Rate', 'Fuel per second must be between 0 and Max Capacity');
+                showAlert('Implausible Rate', 'Fuel per second must be between 0 and 50');
                 return false;
             }
         }
@@ -258,6 +258,29 @@ export default function PitScoutingForm() {
     const handleSubmit = async () => {
         setLoading(true)
         try {
+            // Minimal required-fields check (allow registering new teams)
+            if (!formData.team_number || !formData.scout_name || !formData.event_key) {
+                showAlert('Missing Information', 'Please provide Team #, Event, and Scout Name.');
+                setLoading(false)
+                return
+            }
+
+            // Attempt to register the team in common team tables before inserting pit data.
+            // Some deployments enforce a FK from `pit_scouting.team_number` to a teams table.
+            try {
+                await supabase.from('teams').upsert([
+                    { team_number: parseInt(formData.team_number), team_name: formData.team_name }
+                ], { onConflict: 'team_number' })
+            } catch (e) {
+                // ignore if table doesn't exist or upsert fails
+            }
+            try {
+                await supabase.from('event_teams').upsert([
+                    { team_number: parseInt(formData.team_number), event_key: formData.event_key }
+                ], { onConflict: 'team_number,event_key' })
+            } catch (e) {
+                // ignore if table doesn't exist or upsert fails
+            }
             // First try to delete existing entry, then insert new one
             await supabase.from('pit_scouting').delete().eq('team_number', parseInt(formData.team_number)).eq('event_key', formData.event_key)
             
@@ -284,7 +307,84 @@ export default function PitScoutingForm() {
             ])
 
             if (error) {
-                showAlert('Submission Error', error.message)
+                // Try to detect FK target table from Postgres message and auto-register
+                const fkTableMatch = /is not present in table \"(.+?)\"/i.exec(error.details || error.message || '')
+                if (fkTableMatch) {
+                    const fkTable = fkTableMatch[1]
+                    try {
+                        // Build a sensible upsert payload depending on likely table name
+                        const teamNum = parseInt(formData.team_number)
+                        if (fkTable.toLowerCase().includes('event')) {
+                            await supabase.from(fkTable).upsert([
+                                { team_number: teamNum, event_key: formData.event_key }
+                            ], { onConflict: 'team_number,event_key' })
+                        } else {
+                            await supabase.from(fkTable).upsert([
+                                { team_number: teamNum, team_name: formData.team_name }
+                            ], { onConflict: 'team_number' })
+                        }
+
+                        // Retry the insert once after attempting to register the missing row
+                        const { error: retryErr } = await supabase.from('pit_scouting').insert([
+                            {
+                                team_number: parseInt(formData.team_number),
+                                team_name: formData.team_name,
+                                event_key: formData.event_key,
+                                robot_weight: formData.weight,
+                                fuel_capacity: formData.fuel_capacity,
+                                top_speed: formData.top_speed,
+                                fuel_per_second: formData.fuel_per_second,
+                                primary_role: formData.primary_role,
+                                climb_level: parseInt(formData.climb_level),
+                                climbs_in_auto: formData.climbs_in_auto,
+                                obstacle_handling: formData.obstacle_handling,
+                                drive_train_type: formData.drive_train,
+                                confidence_drive: formData.confidence_drive,
+                                confidence_shooter: formData.confidence_shooter,
+                                confidence_overall: formData.confidence_overall,
+                                scout_name: formData.scout_name,
+                                comments: formData.notes,
+                            },
+                        ])
+
+                        if (retryErr) {
+                            showAlert('Submission Error', retryErr.message)
+                        } else {
+                            showAlert('Success!', 'Pit data locked in successfully!', 'success')
+                            setStep(STEPS.IDENTITY)
+                            setFormData({
+                                team_number: settings.default_team_number ? settings.default_team_number.toString() : '',
+                                team_name: '',
+                                event_key: settings.event_key,
+                                weight: 0,
+                                fuel_capacity: 0,
+                                top_speed: 0,
+                                fuel_per_second: 0,
+                                primary_role: 'Offense',
+                                climb_level: '1',
+                                climbs_in_auto: false,
+                                obstacle_handling: 'None',
+                                drive_train: 'Swerve',
+                                confidence_drive: 50,
+                                confidence_shooter: 50,
+                                confidence_overall: 50,
+                                scout_name: settings.auto_fill_scout_name ? settings.scout_name : '',
+                                notes: '',
+                            })
+                        }
+                        setLoading(false)
+                        return
+                    } catch (upsertErr) {
+                        // Fall through to show original error below
+                        console.error('Auto-registration failed:', upsertErr)
+                    }
+                }
+
+                // Fallback: show original error message
+                const msg = /foreign key|violates foreign key/i.test(error.message || '')
+                    ? `Submission failed: Team ${formData.team_number} is not registered in the database for this event. Please ensure the team exists in the system before submitting.`
+                    : error.message
+                showAlert('Submission Error', msg)
             } else {
                 showAlert('Success!', 'Pit data locked in successfully!', 'success')
                 setStep(STEPS.IDENTITY)
@@ -451,9 +551,9 @@ export default function PitScoutingForm() {
                                             min="0"
                                             max="200"
                                             value={formData.weight}
-                                            onChange={(e) => handleInputChange('weight', Math.min(200, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                            onChange={(e) => handleInputChange('weight', Math.min(135, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
-                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('weight', formData.weight + increment)}>+</Button>
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('weight', Math.min(135, formData.weight + increment))}>+</Button>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -468,7 +568,7 @@ export default function PitScoutingForm() {
                                             value={formData.top_speed}
                                             onChange={(e) => handleInputChange('top_speed', Math.min(30, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         />
-                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('top_speed', formData.top_speed + increment)}>+</Button>
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('top_speed', Math.min(30, formData.top_speed + increment))}>+</Button>
                                     </div>
                                 </div>
                             </div>
@@ -525,7 +625,7 @@ export default function PitScoutingForm() {
                                             value={formData.fuel_capacity}
                                             onChange={(e) => handleInputChange('fuel_capacity', Math.min(500, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
-                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_capacity', formData.fuel_capacity + increment)}>+</Button>
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('fuel_capacity', Math.min(500, formData.fuel_capacity + increment))}>+</Button>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -708,7 +808,8 @@ export default function PitScoutingForm() {
                 {Object.values(STEPS).map((s) => (
                     <div
                         key={s}
-                        className={`h-2 w-2 rounded-full ${s === step ? 'bg-primary' : 'bg-muted'}`}
+                        className={`h-2 w-2 rounded-full transition-colors duration-150 ${s === step ? 'bg-primary ring-1 ring-primary/30' : 'bg-muted-foreground/40 dark:bg-muted-foreground/30 border border-muted-foreground/15'}`}
+                        aria-hidden
                     />
                 ))}
             </div>

@@ -501,7 +501,7 @@ export default function MatchScoutingForm() {
                                         <Button
                                             type="button"
                                             variant={formData.alliance === 'Blue' ? 'default' : 'outline'}
-                                            className={`w-1/2 ${formData.alliance === 'Blue' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                                            className={`w-1/2 ${formData.alliance === 'Blue' ? 'bg-blue-600 text-blue-800 hover:bg-blue-700 ' : ''}`}
                                             onClick={() => handleInputChange('alliance', 'Blue')}
                                         >Blue</Button>
                                     </div>
@@ -601,7 +601,7 @@ export default function MatchScoutingForm() {
                                             value={formData.auto_fuel_scored}
                                             onChange={(e) => handleInputChange('auto_fuel_scored', Math.min(500, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
-                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('auto_fuel_scored', formData.auto_fuel_scored + increment)}>+</Button>
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('auto_fuel_scored', Math.min(500, formData.auto_fuel_scored + increment))}>+</Button>
                                     </div>
                                 </div>
 
@@ -692,7 +692,7 @@ export default function MatchScoutingForm() {
                                             value={formData.teleop_fuel_scored}
                                             onChange={(e) => handleInputChange('teleop_fuel_scored', Math.min(1000, Math.max(0, parseInt(e.target.value) || 0)))}
                                         />
-                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('teleop_fuel_scored', formData.teleop_fuel_scored + increment)}>+</Button>
+                                        <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleInputChange('teleop_fuel_scored', Math.min(1000, formData.teleop_fuel_scored + increment))}>+</Button>
                                     </div>
                                 </div>
 
@@ -847,7 +847,8 @@ export default function MatchScoutingForm() {
                 {Object.values(STEPS).filter(s => typeof s === 'number' && s < 4).map((s) => (
                     <div
                         key={s}
-                        className={`h-2 w-2 rounded-full ${s === step ? 'bg-primary' : 'bg-muted'}`}
+                        className={`h-2 w-2 rounded-full transition-colors duration-150 ${s === step ? 'bg-primary ring-1 ring-primary/30' : 'bg-muted-foreground/40 dark:bg-muted-foreground/30 border border-muted-foreground/15'}`}
+                        aria-hidden
                     />
                 ))}
             </div>
