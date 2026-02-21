@@ -258,32 +258,6 @@ export default function PitScoutingForm() {
     const handleSubmit = async () => {
         setLoading(true)
         try {
-            // Minimal required-fields check (allow registering new teams)
-            if (!formData.team_number || !formData.scout_name || !formData.event_key) {
-                showAlert('Missing Information', 'Please provide Team #, Event, and Scout Name.');
-                setLoading(false)
-                return
-            }
-
-            // Attempt to register the team in common team tables before inserting pit data.
-            // Some deployments enforce a FK from `pit_scouting.team_number` to a teams table.
-            try {
-                await supabase.from('teams').upsert([
-                    { team_number: parseInt(formData.team_number), team_name: formData.team_name }
-                ], { onConflict: 'team_number' })
-            } catch (e) {
-                // ignore if table doesn't exist or upsert fails
-            }
-            try {
-                await supabase.from('event_teams').upsert([
-                    { team_number: parseInt(formData.team_number), event_key: formData.event_key }
-                ], { onConflict: 'team_number,event_key' })
-            } catch (e) {
-                // ignore if table doesn't exist or upsert fails
-            }
-            // First try to delete existing entry, then insert new one
-            await supabase.from('pit_scouting').delete().eq('team_number', parseInt(formData.team_number)).eq('event_key', formData.event_key)
-            
             const { error } = await supabase.from('pit_scouting').insert([
                 {
                     team_number: parseInt(formData.team_number),
@@ -307,95 +281,19 @@ export default function PitScoutingForm() {
             ])
 
             if (error) {
-                // Try to detect FK target table from Postgres message and auto-register
-                const fkTableMatch = /is not present in table \"(.+?)\"/i.exec(error.details || error.message || '')
-                if (fkTableMatch) {
-                    const fkTable = fkTableMatch[1]
-                    try {
-                        // Build a sensible upsert payload depending on likely table name
-                        const teamNum = parseInt(formData.team_number)
-                        if (fkTable.toLowerCase().includes('event')) {
-                            await supabase.from(fkTable).upsert([
-                                { team_number: teamNum, event_key: formData.event_key }
-                            ], { onConflict: 'team_number,event_key' })
-                        } else {
-                            await supabase.from(fkTable).upsert([
-                                { team_number: teamNum, team_name: formData.team_name }
-                            ], { onConflict: 'team_number' })
-                        }
-
-                        // Retry the insert once after attempting to register the missing row
-                        const { error: retryErr } = await supabase.from('pit_scouting').insert([
-                            {
-                                team_number: parseInt(formData.team_number),
-                                team_name: formData.team_name,
-                                event_key: formData.event_key,
-                                robot_weight: formData.weight,
-                                fuel_capacity: formData.fuel_capacity,
-                                top_speed: formData.top_speed,
-                                fuel_per_second: formData.fuel_per_second,
-                                primary_role: formData.primary_role,
-                                climb_level: parseInt(formData.climb_level),
-                                climbs_in_auto: formData.climbs_in_auto,
-                                obstacle_handling: formData.obstacle_handling,
-                                drive_train_type: formData.drive_train,
-                                confidence_drive: formData.confidence_drive,
-                                confidence_shooter: formData.confidence_shooter,
-                                confidence_overall: formData.confidence_overall,
-                                scout_name: formData.scout_name,
-                                comments: formData.notes,
-                            },
-                        ])
-
-                        if (retryErr) {
-                            showAlert('Submission Error', retryErr.message)
-                        } else {
-                            showAlert('Success!', 'Pit data locked in successfully!', 'success')
-                            setStep(STEPS.IDENTITY)
-                            setFormData({
-                                team_number: settings.default_team_number ? settings.default_team_number.toString() : '',
-                                team_name: '',
-                                event_key: settings.event_key,
-                                weight: 0,
-                                fuel_capacity: 0,
-                                top_speed: 0,
-                                fuel_per_second: 0,
-                                primary_role: 'Offense',
-                                climb_level: '1',
-                                climbs_in_auto: false,
-                                obstacle_handling: 'None',
-                                drive_train: 'Swerve',
-                                confidence_drive: 50,
-                                confidence_shooter: 50,
-                                confidence_overall: 50,
-                                scout_name: settings.auto_fill_scout_name ? settings.scout_name : '',
-                                notes: '',
-                            })
-                        }
-                        setLoading(false)
-                        return
-                    } catch (upsertErr) {
-                        // Fall through to show original error below
-                        console.error('Auto-registration failed:', upsertErr)
-                    }
-                }
-
-                // Fallback: show original error message
-                const msg = /foreign key|violates foreign key/i.test(error.message || '')
-                    ? `Submission failed: Team ${formData.team_number} is not registered in the database for this event. Please ensure the team exists in the system before submitting.`
-                    : error.message
-                showAlert('Submission Error', msg)
+                console.error('Error submitting pit data:', error)
+                showAlert('Submission Error', 'Error submitting data: ' + error.message)
             } else {
-                showAlert('Success!', 'Pit data locked in successfully!', 'success')
+                showAlert('Success!', 'Pit data submitted successfully!', 'success')
                 setStep(STEPS.IDENTITY)
                 setFormData({
                     team_number: settings.default_team_number ? settings.default_team_number.toString() : '',
                     team_name: '',
                     event_key: settings.event_key,
-                    weight: 0,
-                    fuel_capacity: 0,
-                    top_speed: 0,
-                    fuel_per_second: 0,
+                    weight: 80,
+                    fuel_capacity: 20,
+                    top_speed: 12,
+                    fuel_per_second: 10,
                     primary_role: 'Offense',
                     climb_level: '1',
                     climbs_in_auto: false,
@@ -410,6 +308,7 @@ export default function PitScoutingForm() {
             }
         } catch (err) {
             console.error('Unexpected error:', err)
+            showAlert('System Error', 'Unexpected error occurred during submission.')
         } finally {
             setLoading(false)
         }
@@ -798,7 +697,7 @@ export default function PitScoutingForm() {
                     ) : (
                         <Button onClick={handleSubmit} disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Lock In Specs
+                            Submit Pit Data
                         </Button>
                     )}
                 </CardFooter>
