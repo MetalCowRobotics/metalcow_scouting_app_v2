@@ -106,8 +106,9 @@ export default function AnalyticsDashboard() {
     const [eventKey, setEventKey] = useState(settings.event_key)
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'rankings' | 'graphs' | 'compare' | 'tba'>('rankings')
-    const [robotStatFilter, setRobotStatFilter] = useState<string[]>(['weight'])
+    const [robotStatFilter, setRobotStatFilter] = useState<string[]>(['can_climb'])
     const [climbFilter, setClimbFilter] = useState<string>('all')
+    const [compareStatFilter, setCompareStatFilter] = useState<string>('weight')
     
     // TBA Data
     const [tbaEvent, setTbaEvent] = useState<TBAEvent | null>(null)
@@ -345,7 +346,43 @@ export default function AnalyticsDashboard() {
             case 'team_number': return `#${team.team_number}`
             case 'scout_name': return team.scout_name || 'N/A'
             case 'accuracy': return team.accuracy ? `${team.accuracy}%` : 'N/A'
+            case 'match_number': return team.match_number ? `#${team.match_number}` : 'N/A'
+            case 'robot_status': return team.robot_status || 'N/A'
+            case 'roll': return team.roll_of_robot || 'N/A'
+            case 'defense': return team.defense_rating ? `${team.defense_rating}%` : 'N/A'
+            case 'ferry': return team.ferry || 'N/A'
             default: return 'N/A'
+        }
+    }
+
+    const renderStatCell = (team: TeamStat, stat: string): React.ReactNode => {
+        switch (stat) {
+            case 'weight': return team.robot_weight ? `${team.robot_weight} lb` : '-'
+            case 'auto': return team.auto_abilities || '-'
+            case 'start_pos': return team.start_position || '-'
+            case 'can_climb': return team.can_climb ? <Badge className="bg-primary/20 text-primary">Yes</Badge> : <span className="text-muted-foreground">No</span>
+            case 'can_descend': return team.can_descend ? <Badge className="bg-primary/20 text-primary">Yes</Badge> : <span className="text-muted-foreground">No</span>
+            case 'collection_speed': return team.collection_speed || '-'
+            case 'shoot_speed': return team.shoot_speed || '-'
+            case 'drive_train': return <span className="text-xs">{team.drive_train_type || '-'}</span>
+            case 'movement': return team.movement_abilities || '-'
+            case 'scoring_speed': return team.scoring_speed || '-'
+            case 'ranking_points': return team.ranking_points || '-'
+            case 'traversal': return team.traversal ? <Badge className="bg-blue-500/20 text-blue-600">Yes</Badge> : <span className="text-muted-foreground">-</span>
+            case 'super_charged': return team.super_charged ? <Badge className="bg-green-500/20 text-green-600">Yes</Badge> : <span className="text-muted-foreground">-</span>
+            case 'accuracy': return team.accuracy ? `${team.accuracy}%` : '-'
+            case 'match_number': return team.match_number ? `#${team.match_number}` : '-'
+            case 'robot_status': return team.robot_status ? <Badge variant={team.robot_status === 'Functional' ? 'default' : 'destructive'}>{team.robot_status}</Badge> : '-'
+            case 'roll': return team.roll_of_robot || '-'
+            case 'defense': return team.defense_rating ? (
+                <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className={cn("h-1.5 w-2 rounded-full", i < Math.round(team.defense_rating || 0) ? "bg-primary" : "bg-muted")} />
+                    ))}
+                </div>
+            ) : '-'
+            case 'ferry': return team.ferry || '-'
+            default: return getStatValue(team, stat)
         }
     }
 
@@ -363,7 +400,7 @@ export default function AnalyticsDashboard() {
                     <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
                         <BarChart3 className="h-10 w-10 text-primary" /> Analytics
                     </h1>
-                    <p className="text-muted-foreground text-lg">Team rankings, climb data, and robot stats</p>
+                    <p className="text-muted-foreground text-lg">Team rankings, climb data, and match performance</p>
                 </div>
 
                 <div className="flex flex-wrap gap-4 w-full md:w-auto">
@@ -500,14 +537,14 @@ export default function AnalyticsDashboard() {
                         </Card>
                     </div>
 
-                    {/* Robot Stats - Horizontal Tab Layout */}
+                    {/* Match Performance - Horizontal Tab Layout */}
                     <Card className="border-2 shadow-xl">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 mb-4">
-                                <Radar className="h-5 w-5 text-primary" /> Robot Stats
+                                <Activity className="h-5 w-5 text-primary" /> Match Performance
                             </CardTitle>
                             <div className="flex flex-wrap gap-2">
-                                {ROBOT_STAT_OPTIONS.map(opt => (
+                                {FIELD_STAT_OPTIONS.map(opt => (
                                     <Button
                                         key={opt.value}
                                         variant={robotStatFilter.includes(opt.value) ? "default" : "outline"}
@@ -531,7 +568,7 @@ export default function AnalyticsDashboard() {
                                     </Button>
                                 ))}
                             </div>
-                            <CardDescription>View teams by selected robot statistic</CardDescription>
+                            <CardDescription>View teams by selected match statistic</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -652,43 +689,52 @@ export default function AnalyticsDashboard() {
             {activeTab === 'compare' && (
                 <div className="space-y-6">
                     <Card className="border-2 shadow-xl">
-                        <CardHeader className="border-b">
-                            <div className="flex items-center justify-between">
+                        <CardHeader className="border-b pb-4">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                                 <CardTitle className="flex items-center gap-2">
                                     <GitCompare className="h-5 w-5 text-primary" /> Team Comparison
                                 </CardTitle>
-                                <Select value={climbFilter} onValueChange={(value) => value && setClimbFilter(value)}>
-                                    <SelectTrigger className="w-48">
-                                        <SelectValue placeholder="Filter by climb" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Teams</SelectItem>
-                                        <SelectItem value="can_climb">Can Climb</SelectItem>
-                                        <SelectItem value="traversal">Traversal</SelectItem>
-                                        <SelectItem value="super_charged">Super Charged</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <Select value={climbFilter} onValueChange={(value) => value && setClimbFilter(value)}>
+                                        <SelectTrigger className="w-40">
+                                            <SelectValue placeholder="Filter by climb" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Teams</SelectItem>
+                                            <SelectItem value="can_climb">Can Climb</SelectItem>
+                                            <SelectItem value="traversal">Traversal</SelectItem>
+                                            <SelectItem value="super_charged">Super Charged</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Select 
+                                        value={compareStatFilter} 
+                                        onValueChange={(value) => value && setCompareStatFilter(value)}
+                                    >
+                                        <SelectTrigger className="w-48">
+                                            <SelectValue placeholder="Select stat" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ROBOT_STAT_OPTIONS.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>
+                                                    <div className="flex items-center gap-2">
+                                                        <opt.icon className="h-4 w-4" />
+                                                        {opt.label}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <CardDescription>Compare teams across all statistics</CardDescription>
+                            <CardDescription className="mt-2">Compare teams by selected statistic</CardDescription>
                         </CardHeader>
                         <CardContent className="overflow-x-auto">
                             <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
                                     <TableHead>Team</TableHead>
-                                    <TableHead>Weight</TableHead>
-                                    <TableHead>Auto</TableHead>
-                                    <TableHead>Start Pos</TableHead>
-                                    <TableHead>Climb</TableHead>
-                                    <TableHead>Descend</TableHead>
-                                    <TableHead>Collection</TableHead>
-                                    <TableHead>Shoot</TableHead>
-                                    <TableHead>Drive Train</TableHead>
-                                    <TableHead>Traversal</TableHead>
-                                    <TableHead>Super</TableHead>
+                                    <TableHead>{ROBOT_STAT_OPTIONS.find(o => o.value === compareStatFilter)?.label || compareStatFilter}</TableHead>
                                     <TableHead>Avg Score</TableHead>
-                                    <TableHead>Defense</TableHead>
-                                    <TableHead>Accuracy</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -707,33 +753,10 @@ export default function AnalyticsDashboard() {
                                                     #{team.team_number}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell>{team.robot_weight ? `${team.robot_weight} lb` : '-'}</TableCell>
-                                            <TableCell>{team.auto_abilities || '-'}</TableCell>
-                                            <TableCell>{team.start_position || '-'}</TableCell>
                                             <TableCell>
-                                                {team.can_climb ? <Badge className="bg-primary/20 text-primary">Yes</Badge> : <span className="text-muted-foreground">No</span>}
-                                            </TableCell>
-                                            <TableCell>
-                                                {team.can_descend ? <Badge className="bg-primary/20 text-primary">Yes</Badge> : <span className="text-muted-foreground">No</span>}
-                                            </TableCell>
-                                            <TableCell>{team.collection_speed || '-'}</TableCell>
-                                            <TableCell>{team.shoot_speed || '-'}</TableCell>
-                                            <TableCell className="text-xs">{team.drive_train_type || '-'}</TableCell>
-                                            <TableCell>
-                                                {team.traversal ? <Badge className="bg-blue-500/20 text-blue-600">Yes</Badge> : <span className="text-muted-foreground">-</span>}
-                                            </TableCell>
-                                            <TableCell>
-                                                {team.super_charged ? <Badge className="bg-green-500/20 text-green-600">Yes</Badge> : <span className="text-muted-foreground">-</span>}
+                                                {renderStatCell(team, compareStatFilter)}
                                             </TableCell>
                                             <TableCell className="font-black text-primary">{Math.round(team.avg_score || 0)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-0.5">
-                                                    {[...Array(5)].map((_, i) => (
-                                                        <div key={i} className={cn("h-1.5 w-2 rounded-full", i < Math.round(team.defense_rating || 0) ? "bg-primary" : "bg-muted")} />
-                                                    ))}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{team.accuracy ? `${team.accuracy}%` : '-'}</TableCell>
                                         </TableRow>
                                     ))}
                             </TableBody>
