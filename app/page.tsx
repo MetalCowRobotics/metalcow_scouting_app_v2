@@ -73,9 +73,9 @@ export default function Home() {
                 {/* Stats */}
                 <div className={`mt-12 flex flex-wrap justify-center gap-8 md:gap-16 transition-all duration-1000 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                     {[
-                        { label: 'Teams Scouted', value: '500+' },
-                        { label: 'Matches Analyzed', value: '10K+' },
-                        { label: 'Events Covered', value: '50+' },
+                        { label: 'Commited Members', value: '30' },
+                        { label: 'Pros', value: '15' },
+                        { label: 'Scouts Deployed', value: '23' },
                     ].map((stat, i) => (
                         <div key={i} className="text-center">
                             <div className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</div>
