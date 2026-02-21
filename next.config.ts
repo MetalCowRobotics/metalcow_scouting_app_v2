@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
             value: 'http',
           },
         ],
-        destination: 'https://:host/:path*',
+        destination: 'host/:path*',
         permanent: true,
       },
     ]
