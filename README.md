@@ -2,6 +2,7 @@
 
 Advanced robotics scouting and analytics platform for FRC (FIRST Robotics Competition). Track matches, analyze performance, and dominate the competition with real-time data collection and strategic insights.   
 
+Trying to deploy through Vercel
 
 ## Features
 
